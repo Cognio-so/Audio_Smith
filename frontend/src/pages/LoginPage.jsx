@@ -36,14 +36,14 @@ export default function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-l from-[#232526] to-[#414345] flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md mx-4 sm:mx-6 md:mx-8 space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">Sign in to your account</h1>
           <p className="mt-2 text-sm text-gray-400">Welcome back to our AI-powered platform</p>
         </div>
 
         <div className="mt-8 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button 
               onClick={googleLogin}
               className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors"

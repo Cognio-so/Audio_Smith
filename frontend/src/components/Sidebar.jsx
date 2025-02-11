@@ -112,51 +112,53 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
     <div className="relative flex">
       <div 
         className={`${
-          isSidebarCollapsed ? 'w-14' : 'w-56'
-        } bg-gradient-to-l from-[#232526] to-[#414345] p-3 flex flex-col transition-all duration-300 ease-in-out border-r border-white/10`}
+          isSidebarCollapsed ? 'w-12 sm:w-14' : 'w-48 sm:w-56'
+        } bg-gradient-to-l from-[#232526] to-[#414345] p-2 sm:p-3 flex flex-col transition-all duration-300 ease-in-out border-r border-white/10`}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <BsLayoutSidebar 
-              className="h-5 w-5 text-[#FAAE7B] cursor-pointer hover:text-white transition-colors"
+              className="h-4 w-4 sm:h-5 sm:w-5 text-[#FAAE7B] cursor-pointer hover:text-white transition-colors"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
             {!isSidebarCollapsed && (
-              <span className="text-sm font-semibold text-slate-100">Mr Smith</span>
+              <span className="text-xs sm:text-sm font-semibold text-slate-100">Mr Smith</span>
             )}
           </div>
           <button 
             onClick={handleNewChat}
-            className="p-1.5 hover:bg-white/10 rounded-md transition-colors duration-200"
+            className="p-1 sm:p-1.5 hover:bg-white/10 rounded-md transition-colors duration-200"
           >
-            <FiPlus className="h-4 w-4 text-[#FAAE7B] hover:text-white" />
+            <FiPlus className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B] hover:text-white" />
           </button>
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-4">
-          <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#FAAE7B]" />
+        <div className="relative mb-3 sm:mb-4">
+          <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
           <input
             type="text"
             placeholder={isSidebarCollapsed ? "Search" : "Search chats..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/5 rounded-md py-1.5 pl-8 pr-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#FAAE7B]/50"
+            className="w-full bg-white/5 rounded-md py-1 sm:py-1.5 pl-7 sm:pl-8 pr-2 text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#FAAE7B]/50"
           />
         </div>
 
-        <div className="flex-grow overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        {/* Chat List */}
+        <div className="flex-grow overflow-y-auto space-y-0.5 sm:space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {sortedChats.map((chat) => (
             <div
               key={chat.id}
-              className={`py-1.5 px-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors duration-200 flex items-center ${
+              className={`py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors duration-200 flex items-center ${
                 activeChat?.id === chat.id ? 'bg-white/10' : ''
               }`}
               onClick={() => handleChatClick(chat)}
             >
-              <IoChatboxEllipses className="h-4 w-4 text-[#FAAE7B]" />
+              <IoChatboxEllipses className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
               {!isSidebarCollapsed && (
-                <span className="ml-2 text-sm text-slate-300 truncate">
+                <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-slate-300 truncate">
                   {chat.title || 'New Chat'}
                 </span>
               )}
@@ -167,7 +169,7 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
         {/* Voice Recording Overlay */}
         <AnimatePresence>
           {isRecording && (
-            <motion.div className="mb-3">
+            <motion.div className="mb-2 sm:mb-3">
               <VoiceRecordingOverlay
                 isRecording={isRecording}
                 onClose={() => setIsRecording(false)}
@@ -176,33 +178,38 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
           )}
         </AnimatePresence>
 
-        <div className="relative mt-auto pt-3">
+        {/* Profile Section */}
+        <div className="relative mt-auto pt-2 sm:pt-3">
           <button
-            className="p-1.5 w-full bg-white/5 rounded-md hover:bg-white/10 transition-colors duration-200 flex items-center justify-center"
+            className="p-1 sm:p-1.5 w-full bg-white/5 rounded-md hover:bg-white/10 transition-colors duration-200 flex items-center justify-center"
             onClick={() => setShowUserDetails(!showUserDetails)}
           >
-            <FiUser className="h-4 w-4 text-[#FAAE7B]" />
-            {!isSidebarCollapsed && <span className="ml-2 text-sm text-slate-200">Profile</span>}
+            <FiUser className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
+            {!isSidebarCollapsed && (
+              <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-slate-200">Profile</span>
+            )}
           </button>
           {showUserDetails && (
             <div className={`absolute bottom-full ${
               isSidebarCollapsed ? 'left-0 translate-x-2' : 'left-0'
-            } right-0 mb-2 p-2 bg-[#232526] rounded-md shadow-lg border border-white/10 z-50`}>
-              <h3 className="font-medium text-sm mb-1 text-slate-100 truncate">{user?.name}</h3>
-              <p className="text-slate-400 text-xs mb-2 truncate">{user?.email}</p>
+            } right-0 mb-2 p-1.5 sm:p-2 bg-[#232526] rounded-md shadow-lg border border-white/10 z-50`}>
+              <h3 className="font-medium text-xs sm:text-sm mb-0.5 sm:mb-1 text-slate-100 truncate">
+                {user?.name}
+              </h3>
+              <p className="text-slate-400 text-[10px] sm:text-xs mb-1.5 sm:mb-2 truncate">
+                {user?.email}
+              </p>
               <button 
                 onClick={logout}
-                className="flex items-center text-red-400 hover:text-red-300 text-xs w-full"
+                className="flex items-center text-red-400 hover:text-red-300 text-[10px] sm:text-xs w-full"
               >
-                <FiLogOut className="h-3 w-3 mr-1 flex-shrink-0" />
+                <FiLogOut className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 flex-shrink-0" />
                 <span className="truncate">Sign Out</span>
               </button>
             </div>
           )}
         </div>
       </div>
-
-      {/* Removed external slider button since we moved it to the top */}
     </div>
   )
 }

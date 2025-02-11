@@ -117,10 +117,15 @@ function MessageInput({ onSendMessage, isLoading }) {
   };
 
   const handleOverlayClose = () => {
-    setIsRecording(false);
-    // Optionally send all overlay messages to the main chat
-    overlayMessages.forEach(msg => onSendMessage(msg.content, msg.role));
-    setOverlayMessages([]);
+    if (isRecording) {
+      // Stop all recording processes
+      if (socketRef.current) socketRef.current.close();
+      if (recorderRef.current) recorderRef.current.stop();
+      if (stopRef.current) stopRef.current();
+      
+      setIsRecording(false);
+      setOverlayMessages([]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -229,25 +234,25 @@ function MessageInput({ onSendMessage, isLoading }) {
 
   return (
     <>
-      <div className="px-4 py-4">
+      <div className="px-2 sm:px-4 py-2 sm:py-4">
         <motion.form
           onSubmit={handleSubmit}
-          className={`relative rounded-2xl transition-all duration-300 max-w-3xl mx-auto ${
+          className={`relative rounded-2xl transition-all duration-300 w-full max-w-3xl mx-auto ${
             isFocused 
               ? 'bg-white/10 shadow-lg shadow-white/5 border border-white/10' 
               : 'bg-white/5'
           }`}
         >
-          <div className="relative flex items-center gap-2 p-3">
+          <div className="relative flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 sm:p-3">
             <motion.button
               type="button"
               onClick={() => setShowModelSelector(!showModelSelector)}
-              className="flex items-center gap-2 p-2 rounded-xl hover:bg-white/10 transition-all duration-200"
+              className="flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 rounded-xl hover:bg-white/10 transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               {getModelIcon(selectedModel)}
-              <span className="text-xs text-[#FAAE7B]">
+              <span className="text-[10px] sm:text-xs text-[#FAAE7B]">
                 {models.find(m => m.id === selectedModel)?.name}
               </span>
             </motion.button>
@@ -259,10 +264,10 @@ function MessageInput({ onSendMessage, isLoading }) {
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Message Audio-Smith..."
-              className="flex-1 bg-transparent px-4 py-3 text-white/90 placeholder:text-white/40 focus:outline-none text-sm rounded-xl transition-all duration-200 focus:bg-white/5"
+              className="w-full sm:w-auto flex-1 bg-transparent px-2 sm:px-4 py-2 sm:py-3 text-white/90 placeholder:text-white/40 focus:outline-none text-xs sm:text-sm rounded-xl transition-all duration-200 focus:bg-white/5"
             />
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -328,9 +333,9 @@ function MessageInput({ onSendMessage, isLoading }) {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute bottom-full left-0 mb-2 w-[300px] bg-white/10 backdrop-blur-md rounded-xl p-2 border border-white/10 z-50"
+                className="absolute bottom-full left-0 mb-2 w-[200px] sm:w-[300px] bg-white/10 backdrop-blur-md rounded-xl p-2 border border-white/10 z-50"
               >
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
                   {models.map((model) => (
                     <button
                       key={model.id}
@@ -338,12 +343,12 @@ function MessageInput({ onSendMessage, isLoading }) {
                         setSelectedModel(model.id);
                         setShowModelSelector(false);
                       }}
-                      className={`p-2 rounded-lg text-xs text-white/80 hover:bg-white/10 transition-all duration-200 flex items-center gap-1.5 justify-center ${
+                      className={`p-1.5 sm:p-2 rounded-lg text-[10px] sm:text-xs text-white/80 hover:bg-white/10 transition-all duration-200 flex items-center gap-1 sm:gap-1.5 justify-center ${
                         selectedModel === model.id ? 'bg-white/20' : ''
                       }`}
                     >
                       {getModelIcon(model.id)}
-                      <span>{model.name}</span>
+                      <span className="hidden xs:inline">{model.name}</span>
                     </button>
                   ))}
                 </div>
@@ -356,10 +361,8 @@ function MessageInput({ onSendMessage, isLoading }) {
       {isRecording && (
         <VoiceRecordingOverlay
           onClose={handleOverlayClose}
-          transcript={overlayMessages}
-          status={isRecording ? "listening" : "idle"}
-          messages={overlayMessages}
           isRecording={isRecording}
+          onMuteToggle={(muted) => setIsMuted(muted)}
         />
       )}
     </>

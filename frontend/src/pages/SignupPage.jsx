@@ -43,14 +43,14 @@ export default function SignupForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-l from-[#232526] to-[#414345] flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md mx-4 sm:mx-6 md:mx-8 space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
           <p className="mt-2 text-sm text-gray-400">Start building with our AI-powered platform</p>
         </div>
 
         <div className="mt-8 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors">
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
