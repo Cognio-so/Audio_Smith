@@ -1,0 +1,162 @@
+import os
+from dotenv import load_dotenv
+import logging
+import google.generativeai as genai
+from openai import AsyncOpenAI
+import anthropic
+import fireworks.client as fireworks
+import groq
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
+
+# Debug: Print API keys
+logger.debug(f"Google API Key: {os.getenv('GOOGLE_API_KEY')}")
+logger.debug(f"OpenAI API Key: {os.getenv('OPENAI_API_KEY')}")
+logger.debug(f"Anthropic API Key: {os.getenv('ANTHROPIC_API_KEY')}")
+logger.debug(f"Fireworks API Key: {os.getenv('FIREWORKS_API_KEY')}")
+logger.debug(f"Groq API Key: {os.getenv('GROQ_API_KEY')}")
+
+# Configure Gemini AI
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY').strip())
+
+# Configure OpenAI (GPT)
+openai_client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY').strip())
+
+# Configure Anthropic (Claude)
+claude_client = anthropic.AsyncAnthropic(api_key=os.getenv('ANTHROPIC_API_KEY').strip())
+
+# Configure Fireworks
+fireworks.api_key = os.getenv('FIREWORKS_API_KEY').strip()
+
+# Configure Groq
+groq_client = groq.Client(api_key=os.getenv('GROQ_API_KEY').strip())
+
+def get_model_instance(model_name):
+    if model_name.startswith("gemini"):
+        return genai.GenerativeModel(model_name)
+    elif model_name.startswith("gpt"):
+        return openai_client
+    elif model_name.startswith("claude"):
+        return claude_client
+    elif model_name.startswith("fireworks"):
+        return fireworks
+    elif model_name.startswith("groq"):
+        return groq_client
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
+
+async def generate_response(messages, model_name):
+    try:
+        logger.info(f"Generating response with model {model_name} and messages: {messages}")
+        
+        # Initialize the model
+        model = get_model_instance(model_name)
+        
+        if model_name.startswith("gemini"):
+            # Create the prompt for Gemini
+            prompt = f"{messages[0]['content']}\n\nUser: {messages[1]['content']}\nAssistant:"
+            response = model.generate_content(prompt)
+            yield response.text
+        elif model_name.startswith("gpt"):
+            # Create the prompt for GPT
+            response = await model.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                stream=True
+            )
+            async for chunk in response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        elif model_name.startswith("claude"):
+            # Create the prompt for Claude
+            response = await model.messages.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=1000,
+                stream=True
+            )
+            async for chunk in response:
+                if chunk.content:
+                    yield chunk.content
+        elif model_name.startswith("fireworks"):
+            # Create the prompt for Fireworks
+            response = model.ChatCompletion.create(
+                model=model_name,
+                messages=messages,
+                stream=True
+            )
+            async for chunk in response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        elif model_name.startswith("groq"):
+            # Create the prompt for Groq
+            response = model.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                stream=True
+            )
+            async for chunk in response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        else:
+            raise ValueError(f"Unsupported model: {model_name}")
+            
+    except ValueError as e:
+        logger.error(f"Model configuration error: {str(e)}")
+        yield f"Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error generating response: {str(e)}")
+        yield f"Error: An unexpected error occurred"
+
+async def generate_related_questions(message: str, model_name: str) -> list:
+    try:
+        model = get_model_instance(model_name)
+        prompt = f"Based on this message: '{message}', generate 3 related follow-up questions. Return them as a simple array of strings."
+        
+        if model_name.startswith("gemini"):
+            response = model.generate_content(prompt)
+            text_response = response.text
+        elif model_name.startswith("gpt"):
+            response = await model.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            text_response = response.choices[0].message.content
+        elif model_name.startswith("claude"):
+            response = await model.messages.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000
+            )
+            text_response = response.content[0].text
+        elif model_name.startswith("fireworks"):
+            response = model.ChatCompletion.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            text_response = response.choices[0].message.content
+        elif model_name.startswith("groq"):
+            response = model.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            text_response = response.choices[0].message.content
+        else:
+            raise ValueError(f"Unsupported model: {model_name}")
+
+        # Parse the response into an array
+        questions = [
+            q.strip() for q in text_response.split('\n') 
+            if q.strip() and not q.strip().startswith('[') and not q.strip().startswith(']')
+        ][:3]
+
+        return questions
+
+    except Exception as e:
+        logger.error(f"Error generating related questions: {str(e)}")
+        return []
