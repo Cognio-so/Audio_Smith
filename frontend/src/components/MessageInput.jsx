@@ -27,29 +27,21 @@ function MessageInput({ onSendMessage, isLoading }) {
   const [selectedModel, setSelectedModel] = useState("gemini-pro");
   const [models, setModels] = useState([
     { id: "gemini-pro", name: "Gemini Pro" },
-    { id: "gemini-flash-2.0", name: "Gemini Flash 2.0" },
     { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
-    { id: "gpt-4o", name: "GPT-4o" },
-    { id: "gpt-4o-mini", name: "GPT-4o Mini" },
-    { id: "gpt3-mini", name: "GPT3 Mini" },
-    { id: "claude-3-opus", name: "Claude 3 Opus" },
-    { id: "claude-3.5-haiku", name: "Claude 3.5 Haiku" },
-    { id: "llama-3.3-70b", name: "Llama 3.3 70B" },
+    { id: "claude-3-opus", name: "Claude 3 Opus" }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const processingTimeoutRef = useRef(null);
   const [error, setError] = useState('');
   const [response, setResponse] = useState('');
+  const [sessionId, setSessionId] = useState(localStorage.getItem('chatSessionId') || '');
 
   const PYTHON_API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
   const handleVoiceInteraction = async () => {
     if (isRecording) {
-      setIsRecording(false);
-      if (socketRef.current) socketRef.current.close();
-      if (recorderRef.current) recorderRef.current.stop();
-      if (stopRef.current) stopRef.current();
+      handleOverlayClose();
       return;
     }
 
@@ -57,51 +49,50 @@ function MessageInput({ onSendMessage, isLoading }) {
       setIsRecording(true);
       setOverlayMessages([]);
       
-      const handleTranscript = async (transcriptData) => {
+      const handleTranscript = async (data) => {
         try {
-          if (!transcriptData?.content || transcriptData.content.trim() === '') {
+          if (!data?.content) {
+            console.warn('Invalid transcript data:', data);
             return;
           }
 
-          // Send user message
-          onSendMessage(transcriptData.content, "user");
+          console.log('Received transcript:', data);
+          onSendMessage(data.content, "user");
 
-          try {
-            const response = await fetch(`${PYTHON_API_URL}/voice-chat`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ 
-                message: transcriptData.content,
-                model: selectedModel,
-                systemPrompt: "You are a conversational assistant named Smith. Keep responses brief and natural."
-              })
-            });
+          const response = await fetch(`${PYTHON_API_URL}/voice-chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Session-ID': sessionId
+            },
+            body: JSON.stringify({
+              message: data.content,
+              model: selectedModel,
+              language: data.language || 'en-US'
+            })
+          });
 
-            if (!response.ok) {
-              throw new Error(`Failed to get response from the server (${response.status}).`);
-            }
+          const responseData = await response.json();
+          console.log('API response:', responseData);
 
-            const data = await response.json();
-            if (data.success && data.response) {
-              // Send AI response
-              onSendMessage(data.response, "assistant");
-
-              // Handle text-to-speech
-              if (!isMuted) {
-                setIsAISpeaking(true);
-                await speakWithDeepgram(data.response);
-                setIsAISpeaking(false);
-              }
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            onSendMessage(`Error: ${error.message}`, "system");
+          if (!responseData.success) {
+            throw new Error(responseData.detail || 'API request failed');
           }
+
+          onSendMessage(responseData.response, "assistant");
+
+          if (!isMuted && responseData.response) {
+            setIsAISpeaking(true);
+            await speakWithDeepgram(
+              responseData.response, 
+              responseData.language || data.language || 'en-US'
+            );
+            setIsAISpeaking(false);
+          }
+
         } catch (error) {
-          console.error('Transcript error:', error);
-          onSendMessage("Failed to process transcript.", "system");
+          console.error('Voice chat error:', error);
+          onSendMessage(`Error: ${error.message}`, "system");
         }
       };
 
@@ -109,6 +100,7 @@ function MessageInput({ onSendMessage, isLoading }) {
       socketRef.current = socket;
       recorderRef.current = recorder;
       stopRef.current = stop;
+
     } catch (error) {
       console.error('Error starting voice interaction:', error);
       setIsRecording(false);
@@ -117,14 +109,16 @@ function MessageInput({ onSendMessage, isLoading }) {
   };
 
   const handleOverlayClose = () => {
-    if (isRecording) {
-      // Stop all recording processes
-      if (socketRef.current) socketRef.current.close();
-      if (recorderRef.current) recorderRef.current.stop();
-      if (stopRef.current) stopRef.current();
-      
-      setIsRecording(false);
-      setOverlayMessages([]);
+    try {
+      if (isRecording) {
+        if (stopRef.current) {
+          stopRef.current();
+        }
+        setIsRecording(false);
+        setOverlayMessages([]);
+      }
+    } catch (error) {
+      console.error('Error closing voice interaction:', error);
     }
   };
 
@@ -140,7 +134,8 @@ function MessageInput({ onSendMessage, isLoading }) {
       const response = await fetch(`${PYTHON_API_URL}/chat`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Session-ID': sessionId
         },
         body: JSON.stringify({
           message: message.trim(),
@@ -155,6 +150,11 @@ function MessageInput({ onSendMessage, isLoading }) {
       const data = await response.json();
       if (data.response) {
         onSendMessage(data.response, "assistant");
+        // Update session ID if provided
+        if (data.sessionId && data.sessionId !== sessionId) {
+          setSessionId(data.sessionId);
+          localStorage.setItem('chatSessionId', data.sessionId);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
@@ -201,23 +201,21 @@ function MessageInput({ onSendMessage, isLoading }) {
     switch (modelId) {
       case "gemini-pro":
       case "gemini-flash-2.0":
-        return <TbBrandGoogleFilled className="h-4 w-4 text-[#FAAE7B]" />;
+        return <TbBrandGoogleFilled className="h-4 w-4 text-[#cc2b5e]" />;
       case "gpt-3.5-turbo":
       case "gpt-4o":
       case "gpt-4o-mini":
       case "gpt3-mini":
-        return <SiOpenai className="h-4 w-4 text-[#FAAE7B]" />;
+        return <SiOpenai className="h-4 w-4 text-[#cc2b5e]" />;
       case "claude-3-opus":
       case "claude-3.5-haiku":
-        return <TbBrain className="h-4 w-4 text-[#FAAE7B]" />;
+        return <TbBrain className="h-4 w-4 text-[#cc2b5e]" />;
       case "llama-3.3-70b":
-        return <SiClarifai className="h-4 w-4 text-[#FAAE7B]" />;
+        return <SiClarifai className="h-4 w-4 text-[#cc2b5e]" />;
       default:
-        return <HiSparkles className="h-4 w-4 text-[#FAAE7B]" />;
+        return <HiSparkles className="h-4 w-4 text-[#cc2b5e]" />;
     }
   };
-
-  
 
   // Clean up on unmount
   useEffect(() => {
@@ -231,6 +229,15 @@ function MessageInput({ onSendMessage, isLoading }) {
       setIsAISpeaking(false);
     };
   }, []);
+
+  useEffect(() => {
+    // Initialize session ID if not exists
+    if (!sessionId) {
+      const newSessionId = `session_${Date.now()}`;
+      setSessionId(newSessionId);
+      localStorage.setItem('chatSessionId', newSessionId);
+    }
+  }, [sessionId]);
 
   return (
     <>
@@ -252,7 +259,7 @@ function MessageInput({ onSendMessage, isLoading }) {
               whileTap={{ scale: 0.95 }}
             >
               {getModelIcon(selectedModel)}
-              <span className="text-[10px] sm:text-xs text-[#FAAE7B]">
+              <span className="text-[10px] sm:text-xs text-[#cc2b5e]">
                 {models.find(m => m.id === selectedModel)?.name}
               </span>
             </motion.button>
@@ -282,7 +289,7 @@ function MessageInput({ onSendMessage, isLoading }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <IoMdAttach className="h-4 w-4 text-[#FAAE7B] hover:text-[#E89B68] transition-colors duration-200" />
+                <IoMdAttach className="h-4 w-4 text-[#cc2b5e] hover:text-[#753a88] transition-colors duration-200" />
               </motion.button>
 
               <motion.button
@@ -295,7 +302,7 @@ function MessageInput({ onSendMessage, isLoading }) {
                 whileTap={{ scale: 0.95 }}
               >
                 <FiMic className={`h-4 w-4 transition-colors duration-200 ${
-                  isRecording ? 'text-red-400' : 'text-[#FAAE7B] hover:text-[#E89B68]'
+                  isRecording ? 'text-red-400' : 'text-[#cc2b5e] hover:text-[#753a88]'
                 }`} />
               </motion.button>
 
@@ -303,13 +310,13 @@ function MessageInput({ onSendMessage, isLoading }) {
                 type="submit"
                 disabled={isLoading || !message.trim()}
                 className={`p-2 rounded-xl transition-all duration-200 ${
-                  message.trim() ? 'bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90' : 'hover:bg-white/10'
+                  message.trim() ? 'bg-gradient-to-r from-[#cc2b5e] to-[#753a88] hover:opacity-90' : 'hover:bg-white/10'
                 }`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <FiSend className={`h-4 w-4 transition-colors duration-200 ${
-                  message.trim() ? 'text-white' : 'text-[#FAAE7B] hover:text-[#E89B68]'
+                  message.trim() ? 'text-white' : 'text-[#cc2b5e] hover:text-[#753a88]'
                 }`} />
               </motion.button>
             </div>
@@ -333,9 +340,9 @@ function MessageInput({ onSendMessage, isLoading }) {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute bottom-full left-0 mb-2 w-[200px] sm:w-[300px] bg-white/10 backdrop-blur-md rounded-xl p-2 border border-white/10 z-50"
+                className="absolute bottom-full left-0 mb-2 w-[280px] sm:w-[350px] bg-white/10 backdrop-blur-md rounded-xl p-1.5 border border-white/10 z-50"
               >
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   {models.map((model) => (
                     <button
                       key={model.id}
@@ -343,12 +350,14 @@ function MessageInput({ onSendMessage, isLoading }) {
                         setSelectedModel(model.id);
                         setShowModelSelector(false);
                       }}
-                      className={`p-1.5 sm:p-2 rounded-lg text-[10px] sm:text-xs text-white/80 hover:bg-white/10 transition-all duration-200 flex items-center gap-1 sm:gap-1.5 justify-center ${
+                      className={`p-1.5 rounded-lg text-white/80 hover:bg-white/10 transition-all duration-200 flex flex-col items-center justify-center gap-0.5 ${
                         selectedModel === model.id ? 'bg-white/20' : ''
                       }`}
                     >
                       {getModelIcon(model.id)}
-                      <span className="hidden xs:inline">{model.name}</span>
+                      <span className="text-center text-[8px] sm:text-[10px] leading-tight">
+                        {model.name}
+                      </span>
                     </button>
                   ))}
                 </div>

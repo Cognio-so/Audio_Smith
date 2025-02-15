@@ -9,7 +9,7 @@ const connectDB = require("./lib/db");
 const authRoutes = require("./routes/authRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const emailRoutes = require('./routes/emailRoutes');
-
+const aiRoutes = require('./routes/aiRoutes');
 const app = express();
 
 // Increase payload limit for voice data
@@ -30,6 +30,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/email", emailRoutes);
 

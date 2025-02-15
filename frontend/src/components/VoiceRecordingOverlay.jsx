@@ -22,84 +22,93 @@ function VoiceRecordingOverlay({ onClose, isRecording, onMuteToggle }) {
     }
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
+    <motion.div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black"
+      transition={{ duration: 0.2 }}
     >
       <div className="relative w-[400px] h-[400px]">
-        {/* Base orb */}
-        <motion.div
-          className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-600 to-purple-600"
-          animate={{
-            scale: isRecording ? [1, intensity, 1] : 1,
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
+        {/* Base orb with immediate appearance */}
+        <div className="absolute inset-0 rounded-full overflow-hidden">
+          <motion.div
+            initial={{ scale: 1 }}
+            className="w-full h-full bg-gradient-to-r from-[#cc2b5e] to-[#753a88]"
+            animate={{
+              scale: isRecording ? [1, intensity, 1] : 1,
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        </div>
 
         {/* Outer glow layer */}
-        <motion.div
-          className="absolute inset-[-20px] rounded-full opacity-40"
-          style={{
-            background: 'radial-gradient(circle at center, transparent 30%, #4F46E5 70%, #A855F7 100%)',
-            filter: 'blur(40px)',
-          }}
-          animate={{
-            scale: isRecording ? [1, intensity * 1.1, 1] : 1,
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.2
-          }}
-        />
+        <div className="absolute inset-[-20px] rounded-full opacity-40">
+          <motion.div
+            initial={{ scale: 1 }}
+            className="w-full h-full"
+            style={{
+              background: 'radial-gradient(circle at center, transparent 30%, #cc2b5e 70%, #753a88 100%)',
+              filter: 'blur(40px)',
+            }}
+            animate={{
+              scale: isRecording ? [1, intensity * 1.1, 1] : 1,
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.2
+            }}
+          />
+        </div>
 
         {/* Inner bright core */}
-        <motion.div
-          className="absolute inset-[60px] rounded-full"
-          style={{
-            background: 'radial-gradient(circle at center, white 0%, #93C5FD 30%, transparent 70%)',
-            filter: 'blur(10px)',
-          }}
-          animate={{
-            scale: isRecording ? [1, intensity * 0.9, 1] : 1,
-            opacity: isRecording ? [0.7, 0.9, 0.7] : 0.7,
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
+        <div className="absolute inset-[60px] rounded-full">
+          <motion.div
+            initial={{ scale: 1 }}
+            className="w-full h-full"
+            style={{
+              background: 'radial-gradient(circle at center, white 0%, #cc2b5e 30%, transparent 70%)',
+              filter: 'blur(10px)',
+            }}
+            animate={{
+              scale: isRecording ? [1, intensity * 0.9, 1] : 1,
+              opacity: isRecording ? [0.7, 0.9, 0.7] : 0.7,
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        </div>
 
         {/* Dynamic color swirl */}
-        <motion.div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: 'conic-gradient(from 0deg, #3B82F6, #8B5CF6, #3B82F6)',
-            opacity: 0.4,
-            filter: 'blur(20px)',
-          }}
-          animate={{
-            rotate: 360,
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
+        <div className="absolute inset-0 rounded-full overflow-hidden">
+          <motion.div
+            initial={{ rotate: 0 }}
+            className="w-full h-full"
+            style={{
+              background: 'conic-gradient(from 0deg, #cc2b5e, #753a88, #cc2b5e)',
+              opacity: 0.4,
+              filter: 'blur(20px)',
+            }}
+            animate={{
+              rotate: 360,
+            }}
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+        </div>
 
         {/* Glass effect overlay */}
         <div 
@@ -110,29 +119,25 @@ function VoiceRecordingOverlay({ onClose, isRecording, onMuteToggle }) {
           }}
         />
 
-        {/* Bottom buttons container - adjusted position */}
+        {/* Bottom buttons container */}
         <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 flex gap-4">
-          {/* Mute toggle button */}
-          <motion.button
+          <button
             onClick={handleMuteToggle}
-            className="p-4 rounded-full bg-gray-800/50 hover:bg-gray-700/50 transition-colors"
-            whileTap={{ scale: 0.95 }}
+            className="p-4 rounded-full bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-white/10 transition-colors"
           >
             {isMuted ? (
-              <FiMicOff className="w-6 h-6 text-red-500" />
+              <FiMicOff className="w-6 h-6 text-[#cc2b5e]" />
             ) : (
               <FiMic className="w-6 h-6 text-white" />
             )}
-          </motion.button>
+          </button>
 
-          {/* Close button */}
-          <motion.button
-            onClick={handleClose}
-            className="p-4 rounded-full bg-gray-800/50 hover:bg-gray-700/50 transition-colors"
-            whileTap={{ scale: 0.95 }}
+          <button
+            onClick={onClose}
+            className="p-4 rounded-full bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-white/10 transition-colors"
           >
             <FiX className="w-6 h-6 text-white" />
-          </motion.button>
+          </button>
         </div>
       </div>
     </motion.div>

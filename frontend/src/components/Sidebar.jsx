@@ -3,15 +3,12 @@ import { FiUser, FiLogOut, FiSearch, FiPlus } from "react-icons/fi"
 import { IoChatboxEllipses } from "react-icons/io5"
 import { BsLayoutSidebar } from "react-icons/bs"
 import { useAuth } from "../context/AuthContext"
-import VoiceRecordingOverlay from "./VoiceRecordingOverlay"
-import { AnimatePresence, motion } from "framer-motion"
 
 function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
   const { user, logout } = useAuth()
   const [showUserDetails, setShowUserDetails] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [isRecording, setIsRecording] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
 
   useEffect(() => {
@@ -113,13 +110,13 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
       <div 
         className={`${
           isSidebarCollapsed ? 'w-12 sm:w-14' : 'w-48 sm:w-56'
-        } bg-gradient-to-l from-[#232526] to-[#414345] p-2 sm:p-3 flex flex-col transition-all duration-300 ease-in-out border-r border-white/10`}
+        } bg-[#0a0a0a] p-2 sm:p-3 flex flex-col transition-all duration-300 ease-in-out border-r border-white/10`}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <BsLayoutSidebar 
-              className="h-4 w-4 sm:h-5 sm:w-5 text-[#FAAE7B] cursor-pointer hover:text-white transition-colors"
+              className="h-4 w-4 sm:h-5 sm:w-5 text-[#cc2b5e] cursor-pointer hover:text-[#753a88] transition-colors"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
             {!isSidebarCollapsed && (
@@ -130,19 +127,19 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
             onClick={handleNewChat}
             className="p-1 sm:p-1.5 hover:bg-white/10 rounded-md transition-colors duration-200"
           >
-            <FiPlus className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B] hover:text-white" />
+            <FiPlus className="h-3 w-3 sm:h-4 sm:w-4 text-[#cc2b5e] hover:text-[#753a88]" />
           </button>
         </div>
 
         {/* Search Bar */}
         <div className="relative mb-3 sm:mb-4">
-          <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
+          <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-[#cc2b5e]" />
           <input
             type="text"
             placeholder={isSidebarCollapsed ? "Search" : "Search chats..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/5 rounded-md py-1 sm:py-1.5 pl-7 sm:pl-8 pr-2 text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#FAAE7B]/50"
+            className="w-full bg-[#1a1a1a] rounded-md py-1 sm:py-1.5 pl-7 sm:pl-8 pr-2 text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#cc2b5e]/50"
           />
         </div>
 
@@ -151,12 +148,12 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
           {sortedChats.map((chat) => (
             <div
               key={chat.id}
-              className={`py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors duration-200 flex items-center ${
-                activeChat?.id === chat.id ? 'bg-white/10' : ''
+              className={`py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-md hover:bg-[#1a1a1a] cursor-pointer transition-colors duration-200 flex items-center ${
+                activeChat?.id === chat.id ? 'bg-[#1a1a1a]' : ''
               }`}
               onClick={() => handleChatClick(chat)}
             >
-              <IoChatboxEllipses className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
+              <IoChatboxEllipses className="h-3 w-3 sm:h-4 sm:w-4 text-[#cc2b5e]" />
               {!isSidebarCollapsed && (
                 <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-slate-300 truncate">
                   {chat.title || 'New Chat'}
@@ -166,25 +163,13 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
           ))}
         </div>
 
-        {/* Voice Recording Overlay */}
-        <AnimatePresence>
-          {isRecording && (
-            <motion.div className="mb-2 sm:mb-3">
-              <VoiceRecordingOverlay
-                isRecording={isRecording}
-                onClose={() => setIsRecording(false)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Profile Section */}
         <div className="relative mt-auto pt-2 sm:pt-3">
           <button
-            className="p-1 sm:p-1.5 w-full bg-white/5 rounded-md hover:bg-white/10 transition-colors duration-200 flex items-center justify-center"
+            className="p-1 sm:p-1.5 w-full bg-[#1a1a1a] rounded-md hover:bg-[#1a1a1a]/90 transition-colors duration-200 flex items-center justify-center"
             onClick={() => setShowUserDetails(!showUserDetails)}
           >
-            <FiUser className="h-3 w-3 sm:h-4 sm:w-4 text-[#FAAE7B]" />
+            <FiUser className="h-3 w-3 sm:h-4 sm:w-4 text-[#cc2b5e]" />
             {!isSidebarCollapsed && (
               <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-slate-200">Profile</span>
             )}
@@ -192,7 +177,7 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat }) {
           {showUserDetails && (
             <div className={`absolute bottom-full ${
               isSidebarCollapsed ? 'left-0 translate-x-2' : 'left-0'
-            } right-0 mb-2 p-1.5 sm:p-2 bg-[#232526] rounded-md shadow-lg border border-white/10 z-50`}>
+            } right-0 mb-2 p-1.5 sm:p-2 bg-[#1a1a1a] rounded-md shadow-lg border border-white/10 z-50`}>
               <h3 className="font-medium text-xs sm:text-sm mb-0.5 sm:mb-1 text-slate-100 truncate">
                 {user?.name}
               </h3>

@@ -11,30 +11,92 @@ export const startSpeechToTextStreaming = async (onTranscript) => {
 
   const connect = async () => {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 68000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
       console.log('Microphone access granted');
 
-      recorder = new MediaRecorder(stream);
       socket = new WebSocket('wss://api.deepgram.com/v1/listen', [
         'token',
         DEEPGRAM_API_KEY,
       ]);
 
-      socket.onopen = () => {
-        console.log('WebSocket connection established');
-        recorder.start(100);
-        retryCount = 0; // Reset retry count on successful connection
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('WebSocket connection timeout'));
+        }, 5000);
+
+        socket.onopen = () => {
+          clearTimeout(timeout);
+          console.log('WebSocket connection established');
+          resolve();
+        };
+
+        socket.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+      });
+
+      const options = {
+        model: "zeus",
+        punctuate: true,
+        encoding: "linear16",
+        channels: 1,
+        sample_rate: 68000,
+        language: "hi,en",
+        smart_format: true,
+        detect_language: true,
+        interim_results: true,
+        endpointing: 300,
+        vad_events: true,
+        diarize: false,
+        profanity_filter: false,
+        redact: false,
+        multilingual: true
       };
+
+      socket.send(JSON.stringify({ options }));
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/mp4';
+
+      recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128000
+      });
+
+      let finalTranscript = '';
+      let isFinal = false;
 
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.channel?.alternatives?.[0]?.transcript) {
-            const transcript = data.channel.alternatives[0].transcript;
+          const transcript = data.channel?.alternatives?.[0]?.transcript || '';
+          const language = data.channel?.alternatives?.[0]?.language || 'en-US';
+          isFinal = data.is_final || false;
+
+          if (transcript) {
+            console.log('Received transcript:', transcript, 'isFinal:', isFinal, 'Language:', language);
+            
+            // Send both interim and final transcripts with detected language
             onTranscript({
               content: transcript,
-              role: 'user'
+              language: language,
+              isFinal: isFinal
             });
+
+            if (isFinal) {
+              finalTranscript = transcript;
+              console.log('Final transcript in language:', language);
+            }
           }
         } catch (error) {
           console.error('Error parsing transcript:', error);
@@ -47,15 +109,17 @@ export const startSpeechToTextStreaming = async (onTranscript) => {
           retryCount++;
           console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
           setTimeout(connect, 1000 * retryCount);
-        } else {
-          throw new Error('WebSocket connection error');
         }
       };
 
       socket.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
-        recorder.stop();
-        stream.getTracks().forEach(track => track.stop());
+        if (recorder && recorder.state === 'recording') {
+          recorder.stop();
+        }
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
       };
 
       recorder.ondataavailable = (event) => {
@@ -64,15 +128,16 @@ export const startSpeechToTextStreaming = async (onTranscript) => {
         }
       };
 
-      recorder.onerror = (error) => {
-        console.error('Recorder error:', error);
-        socket.close();
-        throw new Error('Audio recording error');
-      };
+      recorder.start(100);
 
     } catch (error) {
-      console.error('Initialization error:', error);
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      console.error('Setup error:', error);
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (socket) {
+        socket.close();
+      }
       throw error;
     }
   };
@@ -83,9 +148,15 @@ export const startSpeechToTextStreaming = async (onTranscript) => {
     socket,
     recorder,
     stop: () => {
-      if (socket) socket.close();
-      if (recorder) recorder.stop();
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
     }
   };
 }; 

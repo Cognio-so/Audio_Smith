@@ -35,7 +35,7 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-l from-[#232526] to-[#414345] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md mx-4 sm:mx-6 md:mx-8 space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">Sign in to your account</h1>
@@ -46,7 +46,7 @@ export default function LoginForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button 
               onClick={googleLogin}
-              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors"
+              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#1a1a1a] hover:bg-[#2a2a2a] transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -58,7 +58,7 @@ export default function LoginForm() {
             </button>
             <button 
               onClick={githubLogin}
-              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors"
+              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#1a1a1a] hover:bg-[#2a2a2a] transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -72,7 +72,6 @@ export default function LoginForm() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-sm ">
               <span className="px-2 text-gray-400 bg-[#363739] rounded-xl">
@@ -96,7 +95,7 @@ export default function LoginForm() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&:-webkit-autofill]:bg-gray-700 [&:-webkit-autofill]:text-white [&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(55,65,81)_inset]"
                 placeholder="you@example.com"
               />
             </div>
@@ -112,7 +111,7 @@ export default function LoginForm() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&:-webkit-autofill]:bg-gray-700 [&:-webkit-autofill]:text-white [&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(55,65,81)_inset]"
                 placeholder="Enter your password"
               />
             </div>
@@ -142,7 +141,7 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-white/10 rounded-md shadow-sm text-sm font-medium text-white bg-[#363739] hover:bg-[#4A4B4D] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#cc2b5e] to-[#753a88] hover:opacity-90 disabled:opacity-50 transition-colors"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
@@ -150,7 +149,7 @@ export default function LoginForm() {
 
           <p className="mt-4 text-center text-sm text-gray-400">
             Don't have an account?{" "}
-            <Link to="/signup" className="text-blue-500 hover:text-blue-400">
+            <Link to="/signup" className="text-[#cc2b5e] hover:text-[#753a88]">
               Sign up
             </Link>
           </p>

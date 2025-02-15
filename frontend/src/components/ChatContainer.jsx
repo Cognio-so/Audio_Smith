@@ -272,17 +272,17 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
     >
       {message.role !== "user" && (
         <motion.div
-          className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-orange-500/20 to-rose-500/20 flex items-center justify-center border border-white/10"
+          className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#cc2b5e] to-[#753a88] flex items-center justify-center border border-white/10"
           whileHover={{ scale: 1.05 }}
         >
-          <HiSparkles className="w-3 h-3 sm:w-4 sm:h-4 text-[#FAAE7B]" />
+          <HiSparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
         </motion.div>
       )}
 
       <div className={`max-w-[75%] sm:max-w-[60%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl backdrop-blur-sm ${
         message.role === "user" 
-          ? "bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-white shadow-lg shadow-black/10 border border-white/10" 
-          : "bg-white/5 text-slate-200 shadow-lg shadow-black/10 border border-white/5"
+          ? "bg-[#1a1a1a] text-white/90 border border-white/10" 
+          : "bg-[#1a1a1a] text-slate-200 border border-white/10"
       }`}>
         <motion.div
           initial={{ opacity: 0 }}
@@ -306,7 +306,7 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
       </div>
 
       {message.role === "user" && (
-        <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#232526]/40 flex items-center justify-center">
+        <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center border border-white/10">
           <FiUser className="w-3 h-3 sm:w-4 sm:h-4 text-[#FAAE7B]" />
         </div>
       )}
@@ -326,17 +326,17 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
   }, [activeChat]);
 
   return (
-    <div className="flex-1 flex flex-col relative h-full">
+    <div className="flex-1 flex flex-col relative h-full bg-[#0a0a0a]">
       {/* Header */}
-      <div className="px-2 sm:px-4 py-3 sm:py-5 flex items-center border-b border-white/10">
+      <div className="px-2 sm:px-4 py-3 sm:py-5 flex items-center border-b border-white/10 bg-[#0a0a0a] backdrop-blur-xl">
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <BsChatLeftText className="h-4 sm:h-5 w-4 sm:w-5 text-[#FAAE7B]" />
-          <span className="text-white font-medium text-sm sm:text-base">Audio-Smith</span>
+          <BsChatLeftText className="h-4 sm:h-5 w-4 sm:w-5 text-[#cc2b5e]" />
+          <span className="text-white/90 font-medium text-sm sm:text-base">Mr-Smith</span>
         </div>
       </div>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
+      {/* Messages Container with hidden scrollbar */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide p-2 sm:p-4 bg-[#0a0a0a]">
         {messages.map((message, index) => (
           <motion.div
             key={`${message.role}-${index}`}
@@ -349,17 +349,17 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
           >
             {message.role !== "user" && (
               <motion.div
-                className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-orange-500/20 to-rose-500/20 flex items-center justify-center border border-white/10"
+                className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#cc2b5e] to-[#753a88] flex items-center justify-center border border-white/10"
                 whileHover={{ scale: 1.05 }}
               >
-                <HiSparkles className="w-3 h-3 sm:w-4 sm:h-4 text-[#FAAE7B]" />
+                <HiSparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
               </motion.div>
             )}
 
             <div className={`max-w-[75%] sm:max-w-[60%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl backdrop-blur-sm ${
               message.role === "user" 
-                ? "bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-white shadow-lg shadow-black/10 border border-white/10" 
-                : "bg-white/5 text-slate-200 shadow-lg shadow-black/10 border border-white/5"
+                ? "bg-[#1a1a1a] text-white/90 border border-white/10" 
+                : "bg-[#1a1a1a] text-slate-200 border border-white/10"
             }`}>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -383,16 +383,45 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
             </div>
 
             {message.role === "user" && (
-              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#232526]/40 flex items-center justify-center">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center border border-white/10">
                 <FiUser className="w-3 h-3 sm:w-4 sm:h-4 text-[#FAAE7B]" />
               </div>
             )}
           </motion.div>
         ))}
+        
+        {/* Loading Animation - Three Dots Wave */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-start mb-4 sm:mb-6"
+          >
+            <div className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-[#1a1a1a] border border-white/10">
+              <motion.span
+                className="w-2 h-2 bg-[#cc2b5e] rounded-full"
+                animate={{ y: ["0%", "-50%", "0%"] }}
+                transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
+              />
+              <motion.span
+                className="w-2 h-2 bg-[#cc2b5e] rounded-full"
+                animate={{ y: ["0%", "-50%", "0%"] }}
+                transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.span
+                className="w-2 h-2 bg-[#cc2b5e] rounded-full"
+                animate={{ y: ["0%", "-50%", "0%"] }}
+                transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
+              />
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Auto-scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Predefined Prompts and Input */}
+      {/* Predefined Prompts */}
       <div className={`w-full ${isFirstMessage ? 'absolute top-1/2 -translate-y-1/2' : 'relative'}`}>
         {isFirstMessage && (
           <div className="mb-4 sm:mb-6 px-2 sm:px-4">
@@ -400,7 +429,7 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
               {predefinedPrompts.map((item) => (
                 <motion.div
                   key={item.id}
-                  className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-3 sm:p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                  className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-xl p-3 sm:p-4 cursor-pointer hover:bg-white/[0.05] transition-all duration-200 relative before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-r before:from-[#cc2b5e] before:to-[#753a88] before:opacity-0 before:blur-xl before:-z-10 hover:before:opacity-20"
                   onClick={() => handlePromptClick(item.prompt)}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -408,7 +437,7 @@ function ChatContainer({ activeChat, onUpdateChatTitle }) {
                   <h3 className="text-white/90 font-medium text-xs sm:text-sm mb-1 sm:mb-2">
                     {item.title}
                   </h3>
-                  <p className="text-white/50 text-[10px] sm:text-xs line-clamp-2">
+                  <p className="text-gray-400 text-[10px] sm:text-xs line-clamp-2">
                     {item.prompt}
                   </p>
                 </motion.div>
