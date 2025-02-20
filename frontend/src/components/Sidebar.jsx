@@ -1,85 +1,99 @@
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react"
 import { FiUser, FiLogOut, FiSearch, FiPlus } from "react-icons/fi"
 import { IoChatboxEllipses } from "react-icons/io5"
 import { BsLayoutSidebar } from "react-icons/bs"
 import { useAuth } from "../context/AuthContext"
 import { HiMenuAlt2 } from "react-icons/hi"
-import Logo from "./LandingPage/Logo"
+import { formatDistanceToNow } from 'date-fns'
 
-function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = false }) {
+const Sidebar = forwardRef(({ chats, activeChat, setActiveChat, createNewChat, isOpen = false }, ref) => {
   const { user, logout } = useAuth()
   const [showUserDetails, setShowUserDetails] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [chatHistory, setChatHistory] = useState([])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [categorizedChats, setCategorizedChats] = useState({
+    today: [],
+    yesterday: [],
+    lastWeek: [],
+    lastMonth: [],
+    older: []
+  })
 
-  useEffect(() => {
-    loadChatHistory();
-  }, [chats]);
+  const saveCurrentChat = async () => {
+    if (!activeChat?.id) {
+        console.log('No active chat to save');
+        return;
+    }
 
-  const loadChatHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      // Add console.log to debug the token and request
-      console.log('Attempting to load chat history with token:', token);
+        const token = localStorage.getItem('token');
+        
+        // Debug logs
+        console.log('Active Chat:', activeChat);
+        console.log('Attempting to save chat:', {
+            chatId: activeChat.id,
+            title: activeChat.title,
+            hasMessages: Boolean(activeChat.messages?.length)
+        });
 
-      const response = await fetch('http://localhost:5000/api/chats/history', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' // Add this header
-        },
-        credentials: 'include'
-      });
-      
-      // Add console.log to debug the response
-      console.log('Chat history response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Server error:', errorData);
-        throw new Error(`Failed to load chat history: ${response.status}`);
-      }
+        // Get messages from localStorage if not in activeChat
+        let messages = activeChat.messages;
+        if (!messages?.length) {
+            const savedMessages = localStorage.getItem(`chat_${activeChat.id}`);
+            if (savedMessages) {
+                messages = JSON.parse(savedMessages);
+                console.log('Retrieved messages from localStorage:', messages.length);
+            }
+        }
 
-      const data = await response.json();
-      console.log('Loaded chat history data:', data);
+        if (!messages?.length) {
+            console.log('No messages to save');
+            return;
+        }
 
-      if (data.success && data.chats) {
-        // Remove duplicates by chatId
-        const uniqueChats = data.chats.reduce((acc, chat) => {
-          if (!acc.some(existingChat => existingChat.chatId === chat.chatId)) {
-            acc.push(chat);
-          }
-          return acc;
-        }, []);
+        const response = await fetch('http://localhost:5000/api/chats/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                chatId: activeChat.id,
+                title: activeChat.title || 'New Chat',
+                messages: messages.map(msg => ({
+                    content: msg.content,
+                    role: msg.role,
+                    timestamp: msg.timestamp || new Date().toISOString()
+                }))
+            })
+        });
 
-        // Transform the chat history data
-        const formattedChats = uniqueChats.map(chat => ({
-          id: chat.chatId,
-          title: chat.title || 'New Chat',
-          messages: chat.conversation || []
-        }));
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to save chat');
+        }
 
-        setChatHistory(formattedChats);
-        console.log('Formatted chat history:', formattedChats);
-      }
+        console.log('Chat saved successfully:', data);
     } catch (error) {
-      console.error('Error loading chat history:', error);
+        console.error('Error saving chat:', error);
     }
   };
 
   const handleNewChat = () => {
+    // Create new chat without saving current chat
     const newChat = {
-      id: Date.now().toString(), // Temporary ID until backend creates one
+      id: `temp_${Date.now()}`,
       title: 'New Chat',
       messages: []
     };
     
     setActiveChat(newChat);
     setSearchQuery("");
-    createNewChat(newChat); // Pass the new chat object to parent component
-    loadChatHistory();
+    createNewChat(newChat);
   };
 
   const filteredChats = chatHistory.filter(chat => 
@@ -93,10 +107,12 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = fal
     return dateB - dateA;
   });
 
-  const handleChatClick = async (chat) => {
+  // Add a function to refresh chat history
+  const refreshChatHistory = async () => {
     try {
+      console.log('Fetching chat history');
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/chats/${chat.id}`, {
+      const response = await fetch('http://localhost:5000/api/chats/history/all', {
         headers: {
           'Authorization': `Bearer ${token}`
         },
@@ -105,20 +121,91 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = fal
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Loaded chat data:', data); // Debug log
-
-        if (data.success && data.chat) {
-          // Create a new chat object with the conversation
-          const updatedChat = {
-            id: data.chat.chatId,
-            title: data.chat.title || 'New Chat',
-            messages: data.chat.conversation || [] // Make sure to include all messages
-          };
-          console.log('Updated chat object:', updatedChat); // Debug log
-          setActiveChat(updatedChat); // Set this as the active chat
+        if (data.chats) {
+          console.log('Chat history received:', data.chats.length);
+          // Deduplicate chats based on ID
+          const uniqueChats = data.chats.reduce((acc, chat) => {
+            if (!acc.find(c => c.id === chat.id)) {
+              acc.push(chat);
+            }
+            return acc;
+          }, []);
+          categorizeChats(uniqueChats);
         }
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+    }
+  };
+
+  // Expose refreshChatHistory to parent
+  useImperativeHandle(ref, () => ({
+    refreshChatHistory
+  }));
+
+  // Initial load of chat history
+  useEffect(() => {
+    console.log('Initial chat history load');
+    refreshChatHistory();
+  }, []);
+
+  const categorizeChats = (chats) => {
+    const now = new Date();
+    const categories = {
+      today: [],
+      yesterday: [],
+      lastWeek: [],
+      lastMonth: [],
+      older: []
+    };
+
+    chats.forEach(chat => {
+      const lastUpdated = new Date(chat.lastUpdated);
+      const diffDays = Math.floor((now - lastUpdated) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        categories.today.push(chat);
+      } else if (diffDays === 1) {
+        categories.yesterday.push(chat);
+      } else if (diffDays <= 7) {
+        categories.lastWeek.push(chat);
+      } else if (diffDays <= 30) {
+        categories.lastMonth.push(chat);
       } else {
-        console.error('Failed to load chat:', response.statusText);
+        categories.older.push(chat);
+      }
+    });
+
+    setCategorizedChats(categories);
+  };
+
+  const handleChatClick = async (chat) => {
+    const chatId = chat.id || chat.chatId;
+    
+    if (!chatId) {
+      console.error('Invalid chat object:', chat);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/chats/${chatId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.chat) {
+          setActiveChat({
+            id: chatId,
+            title: data.chat.title || 'New Chat',
+            messages: data.chat.messages || []
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading chat:', error);
@@ -129,6 +216,51 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = fal
   const handleMobileMenuClick = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
   }
+
+  // Update the chat list rendering in the return statement
+  const renderChatList = (chats, title) => {
+    if (!chats?.length) return null;
+
+    return (
+      <div className="mb-4">
+        <h3 className="text-xs text-slate-400 px-3 py-2">{title}</h3>
+        {chats.map((chat) => (
+          <div
+            key={chat.id || chat.chatId}
+            className={`group px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 flex items-center gap-3
+              ${activeChat?.id === (chat.id || chat.chatId) ? 'bg-white/5' : ''}`}
+            onClick={() => handleChatClick(chat)}
+          >
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br ${
+              activeChat?.id === (chat.id || chat.chatId) 
+                ? 'from-[#cc2b5e] to-[#753a88]' 
+                : 'from-[#1a1a1a] to-[#2a2a2a]'
+            } flex items-center justify-center border border-white/10 shadow-lg mt-0.5`}>
+              <IoChatboxEllipses className={`h-4 w-4 ${
+                activeChat?.id === (chat.id || chat.chatId) 
+                  ? 'text-white' 
+                  : 'text-slate-400 group-hover:text-[#cc2b5e]'
+              }`} />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="flex-1">
+                <span className={`text-sm truncate block ${
+                  activeChat?.id === (chat.id || chat.chatId) 
+                    ? 'text-slate-200' 
+                    : 'text-slate-400 group-hover:text-slate-200'
+                }`}>
+                  {chat.title || 'New Chat'}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {formatDistanceToNow(new Date(chat.lastUpdated), { addSuffix: true })}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="relative flex">
@@ -240,37 +372,13 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = fal
           </div>
         </div>
 
-        {/* Chat List - Further reduced spacing */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-2 py-1 space-y-0.5">
-          {sortedChats.map((chat) => (
-            <div
-              key={chat.id}
-              className={`group px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 flex items-center gap-3
-                ${activeChat?.id === chat.id ? 'bg-white/5' : ''}`}
-              onClick={() => handleChatClick(chat)}
-            >
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br ${
-                activeChat?.id === chat.id 
-                  ? 'from-[#cc2b5e] to-[#753a88]' 
-                  : 'from-[#1a1a1a] to-[#2a2a2a]'
-              } flex items-center justify-center border border-white/10 shadow-lg mt-0.5`}>
-                <IoChatboxEllipses className={`h-4 w-4 ${
-                  activeChat?.id === chat.id 
-                    ? 'text-white' 
-                    : 'text-slate-400 group-hover:text-[#cc2b5e]'
-                }`} />
-              </div>
-              {!isSidebarCollapsed && (
-                <span className={`text-sm truncate ${
-                  activeChat?.id === chat.id 
-                    ? 'text-slate-200' 
-                    : 'text-slate-400 group-hover:text-slate-200'
-                }`}>
-                  {chat.title || 'New Chat'}
-                </span>
-              )}
-            </div>
-          ))}
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-2 py-1">
+          {renderChatList(categorizedChats.today, 'Today')}
+          {renderChatList(categorizedChats.yesterday, 'Yesterday')}
+          {renderChatList(categorizedChats.lastWeek, 'Last 7 Days')}
+          {renderChatList(categorizedChats.lastMonth, 'Last Month')}
+          {renderChatList(categorizedChats.older, 'Older')}
         </div>
 
         {/* Profile Section */}
@@ -307,7 +415,7 @@ function Sidebar({ chats, activeChat, setActiveChat, createNewChat, isOpen = fal
       </div>
     </div>
   )
-}
+})
 
 export default Sidebar
 

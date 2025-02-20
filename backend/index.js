@@ -7,9 +7,9 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const connectDB = require("./lib/db");
 const authRoutes = require("./routes/authRoutes");
-const chatRoutes = require("./routes/chatRoutes");
 const emailRoutes = require('./routes/emailRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const app = express();
 
 // Increase payload limit for voice data

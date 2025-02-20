@@ -1,11 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { saveChat, getChatHistory, getChat } = require('../controllers/chatController');
 const { protectRoutes } = require('../middleware/authMiddleware');
+const { 
+    saveChat, 
+    getChat, 
+    getChatHistory,
+    updateChat 
+} = require('../controllers/chatController');
 
-// Protected routes - require authentication
+// Base route is /api/chats
+
+// Get chat history - ensure this comes before :chatId route
+router.get('/history/all', protectRoutes, getChatHistory);
+
+// Save new chat
 router.post('/save', protectRoutes, saveChat);
-router.get('/history', protectRoutes, getChatHistory);
+
+// Update existing chat
+router.put('/:chatId/update', protectRoutes, updateChat);
+
+// Get specific chat
 router.get('/:chatId', protectRoutes, getChat);
 
 module.exports = router; 

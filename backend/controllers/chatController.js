@@ -1,117 +1,127 @@
 const Chat = require('../model/Chat');
 
-const saveChat = async (req, res) => {
+exports.saveChat = async (req, res) => {
     try {
-        const { chatId, title, conversation } = req.body;
-        const userId = req.user._id; // Make sure we're using _id from mongoose
+        const { chatId, title, messages } = req.body;
+        const userId = req.user._id;
 
-        if (!chatId || !conversation) {
+        // Handle temporary chat IDs
+        const finalChatId = chatId.startsWith('temp_') 
+            ? `chat_${Date.now()}` 
+            : chatId;
+
+        if (!messages?.length) {
             return res.status(400).json({
                 success: false,
-                message: "ChatId and conversation are required"
+                error: 'No messages to save'
             });
         }
 
-        // Save entire conversation at once
-        const chat = await Chat.findOneAndUpdate(
-            { chatId, userId },
-            { 
-                title,
-                conversation,
-                lastUpdated: new Date()
-            },
-            { 
-                upsert: true, 
-                new: true,
-                setDefaultsOnInsert: true
-            }
-        );
-
-        console.log('Chat saved:', chat); // Add logging
+        const chat = await Chat.updateWithMessages(userId, finalChatId, messages, title);
 
         res.json({ 
             success: true, 
-            chat,
-            message: "Chat saved successfully" 
+            chat: {
+                id: chat.chatId,
+                title: chat.title,
+                messages: chat.messages,
+                lastUpdated: chat.lastUpdated
+            } 
         });
     } catch (error) {
         console.error('Save chat error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: "Error saving chat conversation",
-            error: error.message 
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
-const getChatHistory = async (req, res) => {
-    try {
-        const userId = req.user._id; // Make sure we're using _id from mongoose
-        const chats = await Chat.find({ userId })
-            .sort({ lastUpdated: -1 });
-
-        res.json({ 
-            success: true, 
-            chats,
-            message: "Chat history retrieved successfully"
-        });
-    } catch (error) {
-        console.error('Get chat history error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: "Error fetching chat history",
-            error: error.message
-        });
-    }
-};
-
-const getChat = async (req, res) => {
+exports.getChat = async (req, res) => {
     try {
         const { chatId } = req.params;
         const userId = req.user._id;
 
-        console.log('Fetching chat:', chatId, 'for user:', userId); // Debug log
+        // Don't try to fetch new chats from database
+        if (chatId.startsWith('new_')) {
+            return res.json({ 
+                success: true, 
+                chat: {
+                    chatId,
+                    title: 'New Chat',
+                    messages: [],
+                    lastUpdated: new Date()
+                }
+            });
+        }
 
         const chat = await Chat.findOne({ chatId, userId });
         
         if (!chat) {
-            return res.status(404).json({
-                success: false,
-                message: "Chat not found"
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Chat not found' 
             });
         }
 
-        // Make sure we're sending all the necessary data
-        const chatData = {
-            chatId: chat.chatId,
-            title: chat.title,
-            conversation: chat.conversation.map(msg => ({
-                content: msg.content,
-                role: msg.role,
-                timestamp: msg.timestamp
-            })),
-            lastUpdated: chat.lastUpdated
-        };
-
-        console.log('Sending chat data:', chatData); // Debug log
-
-        res.json({
-            success: true,
-            chat: chatData,
-            message: "Chat retrieved successfully"
-        });
+        res.json({ success: true, chat });
     } catch (error) {
-        console.error('Get chat error:', error);
-        res.status(500).json({
-            success: false,
-            message: "Error retrieving chat",
-            error: error.message
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
-module.exports = {
-    saveChat,
-    getChatHistory,
-    getChat
+exports.getChatHistory = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const chats = await Chat.find({ userId })
+            .select('chatId title lastUpdated messages')
+            .sort({ lastUpdated: -1 })
+            .limit(50); // Limit to recent chats for performance
+
+        res.json({ 
+            success: true, 
+            chats: chats.map(chat => ({
+                id: chat.chatId,
+                title: chat.title,
+                lastUpdated: chat.lastUpdated,
+                preview: chat.messages[chat.messages.length - 1]?.content || ''
+            }))
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+exports.updateChat = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const { title, messages } = req.body;
+        const userId = req.user._id;
+
+        if (!messages?.length) {
+            return res.status(400).json({
+                success: false,
+                error: 'No messages to update'
+            });
+        }
+
+        const chat = await Chat.updateWithMessages(userId, chatId, messages, title);
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                error: 'Chat not found or unauthorized'
+            });
+        }
+
+        res.json({
+            success: true,
+            chat: {
+                id: chat.chatId,
+                title: chat.title,
+                messages: chat.messages,
+                lastUpdated: chat.lastUpdated
+            }
+        });
+    } catch (error) {
+        console.error('Update chat error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 }; 

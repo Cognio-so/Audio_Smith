@@ -8,7 +8,7 @@ import { speakWithDeepgram, stopSpeaking } from '../utils/textToSpeech'
 import { sendEmailWithPDF } from '../utils/emailService'
 import { useAuth } from '../context/AuthContext'
 
-function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
+function ChatContainer({ activeChat, onUpdateChatTitle, isOpen, onChatSaved, onUpdateMessages }) {
   const { user } = useAuth()
   const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -19,6 +19,18 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
   const messagesEndRef = useRef(null)
   const abortControllerRef = useRef(null)
   const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const saveInProgress = useRef(false)
+  const pendingMessages = useRef([])
+  const chatIdRef = useRef(null)
+
+  // Initialize messages when activeChat changes
+  useEffect(() => {
+    if (activeChat) {
+      setMessages(activeChat.messages || [])
+      setIsFirstMessage(!activeChat.messages?.length)
+      chatIdRef.current = activeChat.id
+    }
+  }, [activeChat?.id]) // Only depend on chat ID change
 
   // Load messages when component mounts and when activeChat changes
   useEffect(() => {
@@ -27,91 +39,46 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
       
       setIsLoadingChat(true);
       
-      // For new chats (temporary IDs), don't try to load from backend
-      if (activeChat.id.toString().startsWith(Date.now().toString().slice(0, -4))) {
+      // For temporary chats, just initialize with empty messages
+      if (activeChat.id.startsWith('temp_')) {
         setMessages([]);
         setIsFirstMessage(true);
         setIsLoadingChat(false);
         return;
       }
       
-      // First try to load from localStorage for immediate display
-      const savedMessages = localStorage.getItem(`chat_${activeChat.id}`);
-      if (savedMessages) {
-        const parsedMessages = JSON.parse(savedMessages);
-        setMessages(parsedMessages);
-        setIsFirstMessage(parsedMessages.length === 0);
-      }
-
-      // Add retry logic with exponential backoff
-      const fetchWithRetry = async (retryCount = 0, maxRetries = 3) => {
-        try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:5000/api/chats/${activeChat.id}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            credentials: 'include'
-          });
-
-          // If chat doesn't exist yet, treat it as a new chat
-          if (response.status === 404) {
-            setMessages([]);
-            setIsFirstMessage(true);
-            return null;
-          }
-
-          if (!response.ok) {
-            throw new Error(`Failed to load chat: ${response.status}`);
-          }
-
-          const data = await response.json();
-          return data;
-
-        } catch (error) {
-          if (retryCount < maxRetries && error.message.includes('Rate limit')) {
-            const delay = Math.pow(2, retryCount) * 1000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return fetchWithRetry(retryCount + 1, maxRetries);
-          }
-          throw error;
-        }
-      };
-
       try {
-        const data = await fetchWithRetry();
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/chats/${activeChat.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load chat: ${response.status}`);
+        }
+
+        const data = await response.json();
         
-        if (data) {  // Only process data if it exists
-          if (data.chat && data.chat.conversation) {
-            const formattedMessages = data.chat.conversation.map(msg => ({
-              content: msg.content,
-              role: msg.role,
-              timestamp: msg.timestamp || new Date().toISOString()
-            }));
-            
-            setMessages(formattedMessages);
-            localStorage.setItem(`chat_${activeChat.id}`, JSON.stringify(formattedMessages));
-            setIsFirstMessage(formattedMessages.length === 0);
-          } else if (data.conversation) {
-            const formattedMessages = data.conversation.map(msg => ({
-              content: msg.content,
-              role: msg.role,
-              timestamp: msg.timestamp || new Date().toISOString()
-            }));
-            
-            setMessages(formattedMessages);
-            localStorage.setItem(`chat_${activeChat.id}`, JSON.stringify(formattedMessages));
-            setIsFirstMessage(formattedMessages.length === 0);
-          }
+        if (data.chat?.messages) {
+          const formattedMessages = data.chat.messages.map(msg => ({
+            content: msg.content,
+            role: msg.role,
+            timestamp: msg.timestamp || new Date().toISOString()
+          }));
+          
+          setMessages(formattedMessages);
+          setIsFirstMessage(formattedMessages.length === 0);
         }
       } catch (error) {
         console.error('Error loading chat:', error);
-        // Don't show error message for 404s on new chats
-        if (!error.message.includes('404')) {
+        // Only show error for non-temporary chats
+        if (!activeChat.id.startsWith('temp_')) {
           setMessages(prev => [...prev, {
-            content: `Error: ${error.message}. Using cached data if available.`,
+            content: `Error loading chat: ${error.message}`,
             role: "system",
             timestamp: new Date().toISOString()
           }]);
@@ -124,83 +91,80 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
     loadChat();
   }, [activeChat?.id]);
 
-  // Save chat when messages change
+  // Add this useEffect to sync messages with activeChat
   useEffect(() => {
-    const debouncedSave = setTimeout(() => {
-      if (messages.length > 0 && activeChat?.id) {
-        saveConversation();
-      }
-    }, 1000);
+    if (activeChat?.messages) {
+      setMessages(activeChat.messages);
+      setIsFirstMessage(activeChat.messages.length === 0);
+    } else {
+      setMessages([]);
+      setIsFirstMessage(true);
+    }
+  }, [activeChat]);
 
-    return () => clearTimeout(debouncedSave);
-  }, [messages, activeChat?.id]);
-
-  const saveConversation = async () => {
-    if (!activeChat?.id || messages.length === 0) return;
+  const saveMessages = async (messagesToSave) => {
+    if (!chatIdRef.current || saveInProgress.current) return;
+    
+    saveInProgress.current = true;
 
     try {
-      const token = localStorage.getItem('token');
-      console.log('Saving conversation:', {
-        chatId: activeChat.id,
-        messageCount: messages.length
+      console.log('Saving chat:', {
+        chatId: chatIdRef.current,
+        messageCount: messagesToSave.length
       });
 
-      const response = await fetch('http://localhost:5000/api/chats/save', {
-        method: 'POST',
+      const token = localStorage.getItem('token');
+      const isTemporaryChat = chatIdRef.current.startsWith('temp_');
+      
+      const endpoint = isTemporaryChat 
+        ? 'http://localhost:5000/api/chats/save'
+        : `http://localhost:5000/api/chats/${chatIdRef.current}/update`;
+      
+      const method = isTemporaryChat ? 'POST' : 'PUT';
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         credentials: 'include',
         body: JSON.stringify({
-          chatId: activeChat.id,
-          title: activeChat.title || 'New Chat',
-          conversation: messages.map(msg => ({
-            content: msg.content,
-            role: msg.role,
-            timestamp: msg.timestamp
-          }))
+          chatId: chatIdRef.current,
+          title: activeChat.title || messagesToSave[0]?.content?.slice(0, 30) || 'New Chat',
+          messages: messagesToSave
         })
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to save chat');
+        throw new Error(data.error || 'Failed to save chat');
       }
 
-      const data = await response.json();
-      console.log('Chat saved successfully:', data);
+      if (data.success) {
+        // Update chatId if this was a temporary chat
+        if (isTemporaryChat && data.chat?.id) {
+          chatIdRef.current = data.chat.id;
+        }
+
+        onUpdateMessages(messagesToSave);
+        
+        if (data.chat.title !== activeChat.title) {
+          onUpdateChatTitle(data.chat.title);
+        }
+        
+        if (onChatSaved) {
+          onChatSaved();
+        }
+      }
+
     } catch (error) {
-      console.error('Error saving conversation:', error);
+      console.error('Error saving chat:', error);
+    } finally {
+      saveInProgress.current = false;
     }
   };
-
-  // Save chat before unload
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (messages.length > 0 && activeChat?.id) {
-        // Synchronous save before unload
-        const token = localStorage.getItem('token');
-        fetch('http://localhost:5000/api/chats/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            chatId: activeChat.id,
-            title: activeChat.title || 'New Chat',
-            conversation: messages
-          }),
-          // Make this request synchronous
-          keepalive: true
-        });
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [messages, activeChat]);
 
   // Scroll to bottom when messages change
   const scrollToBottom = () => {
@@ -337,7 +301,17 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
     }
   };
 
+  // Use useEffect to notify parent of message changes
+  useEffect(() => {
+    if (messages.length > 0 && onUpdateMessages) {
+      onUpdateMessages(messages);
+    }
+  }, [messages, onUpdateMessages]);
+
+  // Update the addMessage function
   const addMessage = async (content, role) => {
+    if (!chatIdRef.current) return;
+
     const newMessage = {
       content,
       role,
@@ -346,20 +320,29 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
 
     setMessages(prevMessages => {
       const updatedMessages = [...prevMessages, newMessage];
-      // Save to localStorage immediately
-      if (activeChat?.id) {
-        localStorage.setItem(`chat_${activeChat.id}`, JSON.stringify(updatedMessages));
+      
+      // Only save after AI response is received
+      if (role === 'assistant') {
+        saveMessages(updatedMessages);
       }
+      
       return updatedMessages;
     });
 
     if (role === "user") {
       setIsFirstMessage(false);
       setIsLoading(true);
-    } else {
+    } else if (role === "assistant") {
       setIsLoading(false);
     }
   };
+
+  // Handle pending saves when loading state changes
+  useEffect(() => {
+    if (!isLoading && pendingMessages.current.length > 0) {
+      saveMessages(pendingMessages.current);
+    }
+  }, [isLoading]);
 
   const handleStopResponse = () => {
     stopSpeaking();
@@ -439,6 +422,26 @@ function ChatContainer({ activeChat, onUpdateChatTitle, isOpen }) {
       ))}
     </div>
   );
+
+  // When creating new chat
+  const createNewChat = () => {
+    const newChat = {
+        id: `temp_${Date.now()}`, // Use consistent id property
+        title: 'New Chat',
+        messages: []
+    };
+    setActiveChat(newChat);
+  };
+
+  // Cleanup on unmount or chat change
+  useEffect(() => {
+    return () => {
+      setIsLoading(false);
+      saveInProgress.current = false;
+      pendingMessages.current = [];
+      chatIdRef.current = null;
+    };
+  }, [activeChat?.id]);
 
   return (
     <div className={`flex-1 flex flex-col relative h-screen bg-[#0a0a0a] ${
