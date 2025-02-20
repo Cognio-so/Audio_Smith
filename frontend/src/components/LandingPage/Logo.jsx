@@ -13,7 +13,7 @@ const Logo = () => {
       >
         {/* Logo image */}
         <motion.img
-          src="/vaani-pro.png" // Update this path based on where you saved the image
+          src="/vannipro.png" // Update this path based on where you saved the image
           alt="Vaani.pro Logo"
           className="w-full h-full object-contain"
           whileHover={{
@@ -39,7 +39,7 @@ const Logo = () => {
           ease: "easeInOut"
         }}
       >
-        vaani.pro
+        
       </motion.span>
     </motion.div>
   );

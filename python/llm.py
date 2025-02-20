@@ -42,13 +42,19 @@ groq_client = groq.Client(api_key=os.getenv('GROQ_API_KEY').strip())
 conversation_memories = {}
 
 def get_or_create_memory(session_id):
+    """Get or create a conversation memory for a session."""
+    if not session_id:
+        return None
     if session_id not in conversation_memories:
-        conversation_memories[session_id] = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        conversation_memories[session_id] = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
     return conversation_memories[session_id]
 
 def get_model_instance(model_name):
     if model_name.startswith("gemini"):
-        return genai.GenerativeModel(model_name)
+        return genai.GenerativeModel('gemini-pro')
     elif model_name.startswith("gpt"):
         return openai_client
     elif model_name.startswith("claude"):
@@ -62,10 +68,20 @@ def get_model_instance(model_name):
 
 async def generate_response(messages, model_name, session_id=None):
     try:
-        logger.info(f"Generating response with model {model_name}")
+        logger.info(f"Generating response with model {model_name} for session {session_id}")
         
         model = get_model_instance(model_name)
         memory = get_or_create_memory(session_id) if session_id else None
+
+        # If we have memory, add previous conversation context
+        if memory and memory.chat_memory.messages:
+            context_messages = []
+            for msg in memory.chat_memory.messages[-4:]:  # Last 4 messages for context
+                if isinstance(msg, HumanMessage):
+                    context_messages.append({"role": "user", "content": msg.content})
+                elif isinstance(msg, AIMessage):
+                    context_messages.append({"role": "assistant", "content": msg.content})
+            messages = context_messages + messages
 
         # Extract language from system message
         language = 'en-US'

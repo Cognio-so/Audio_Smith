@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 from uuid import uuid4
 import time
+from starlette.background import BackgroundTask
 
 # Load environment variables
 load_dotenv()
@@ -35,39 +36,87 @@ app.add_middleware(
 sessions = {}
 
 async def get_session_id(request: Request):
+    """Get or create a session ID from request headers."""
     session_id = request.headers.get('X-Session-ID')
     if not session_id:
-        session_id = str(uuid4())
-        sessions[session_id] = {'created_at': time.time()}
+        session_id = f"session_{uuid4()}"
+    
+    # Initialize session if it doesn't exist
+    if session_id not in sessions:
+        sessions[session_id] = {
+            'created_at': time.time(),
+            'last_accessed': time.time()
+        }
+    else:
+        sessions[session_id]['last_accessed'] = time.time()
+    
     return session_id
 
 @app.post("/chat")
 async def chat_endpoint(request: Request, session_id: str = Depends(get_session_id)):
     try:
-        body = await request.json() 
+        # Cancel previous request if header is present
+        if request.headers.get('X-Cancel-Previous') == 'true':
+            previous_request = sessions[session_id].get('current_request')
+            if previous_request:
+                sessions[session_id]['cancelled'] = True
+
+        body = await request.json()
         message = body.get('message', '').strip()
         model = body.get('model', 'gemini-pro').strip()
-        system_prompt = body.get('systemPrompt', 'You are a conversational assistant.').strip()
+        
+        # Map model names to their cheaper versions
+        model_mapping = {
+            'gpt-4': 'gpt-3.5-turbo',
+            'claude-3-opus': 'claude-3-haiku',
+            'llama-70b': 'llama-v2-7b',
+            'mixtral-8x7b-instruct': 'mixtral-8x7b'
+        }
+        
+        model = model_mapping.get(model, model)
+        request_id = request.headers.get('X-Request-ID')
+
+        sessions[session_id]['current_request'] = request_id
+        sessions[session_id]['cancelled'] = False
 
         if not message:
             raise HTTPException(status_code=400, detail="No message provided")
 
         # Prepare messages for the model
         messages = [
-            {"role": "system", "content": system_prompt},
             {"role": "user", "content": message}
         ]
 
-        # Generate response with session ID
-        response = ""
-        async for chunk in generate_response(messages, model, session_id):
-            response += chunk
+        # Use StreamingResponse instead of mixing yield and return
+        async def response_generator():
+            try:
+                full_response = ""
+                async for chunk in generate_response(messages, model, session_id):
+                    if sessions[session_id].get('cancelled', False):
+                        logger.info(f"Request {request_id} was cancelled")
+                        break
+                    
+                    # Only send the new chunk, not the accumulated response
+                    if chunk:
+                        yield f"data: {chunk}\n\n"
+                
+                # Send DONE marker only once at the end
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"Error generating response: {str(e)}")
+                yield f"data: Error: {str(e)}\n\n"
+                yield "data: [DONE]\n\n"
 
-        return JSONResponse({
-            "success": True,
-            "response": response,
-            "sessionId": session_id
-        })
+        return StreamingResponse(
+            response_generator(),
+            media_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Content-Type': 'text/event-stream',
+                'X-Accel-Buffering': 'no'
+            }
+        )
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
@@ -76,18 +125,30 @@ async def chat_endpoint(request: Request, session_id: str = Depends(get_session_
 @app.post("/voice-chat")
 async def voice_chat_endpoint(request: Request, session_id: str = Depends(get_session_id)):
     try:
+        logger.info(f"Received voice chat request for session {session_id}")
+        
+        # Update session last accessed time
+        sessions[session_id]['last_accessed'] = time.time()
+        
         body = await request.json()
         message = body.get('message', '').strip()
         model = body.get('model', 'gemini-pro').strip()
-        language = body.get('language', 'en-US').strip()  # This comes from Deepgram's detection
+        language = body.get('language', 'en-US').strip()
+        request_id = request.headers.get('X-Request-ID')
+
+        logger.info(f"Processing voice request {request_id} with message: {message[:50]}...")
 
         if not message:
+            logger.warning("Empty message received")
             return JSONResponse({
                 "success": False,
                 "detail": "No message provided"
             }, status_code=400)
 
-        logger.info(f"Voice chat request: message='{message}', model={model}, language={language}")
+        # Store the current request ID in the session
+        previous_request = sessions[session_id].get('current_request')
+        sessions[session_id]['current_request'] = request_id
+        logger.info(f"Updated session request ID from {previous_request} to {request_id}")
 
         # Enhanced system prompt for multilingual support
         system_prompt = (
@@ -107,11 +168,16 @@ async def voice_chat_endpoint(request: Request, session_id: str = Depends(get_se
         try:
             response = ""
             async for chunk in generate_response(messages, model, session_id):
+                # Check if the request is still valid
+                if sessions[session_id].get('current_request') != request_id:
+                    logger.warning(f"Request {request_id} was superseded")
+                    raise HTTPException(status_code=409, detail="Request superseded")
                 response += chunk
 
             if not response:
                 raise ValueError("No response generated")
 
+            logger.info(f"Successfully generated response for voice request {request_id}")
             return JSONResponse({
                 "success": True,
                 "response": response,

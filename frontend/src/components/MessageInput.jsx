@@ -26,18 +26,66 @@ function MessageInput({ onSendMessage, isLoading }) {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [selectedModel, setSelectedModel] = useState("gemini-pro");
   const [models, setModels] = useState([
-    { id: "gemini-pro", name: "Gemini Pro" },
-    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
-    { id: "claude-3-opus", name: "Claude 3 Opus" }
+    { id: "gemini-pro", name: "Gemini Pro", cost: "Cheapest" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5", cost: "Low" },
+    { id: "claude-3-haiku", name: "Claude Haiku", cost: "Low" },
+    { id: "llama-v2-7b", name: "Llama2 7B", cost: "Free" },
+    { id: "mixtral-8x7b", name: "Mixtral 8x7B", cost: "Low" }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const processingTimeoutRef = useRef(null);
   const [error, setError] = useState('');
   const [response, setResponse] = useState('');
-  const [sessionId, setSessionId] = useState(localStorage.getItem('chatSessionId') || '');
+  const [sessionId, setSessionId] = useState(() => {
+    // Get existing session ID or create a new one
+    const existingId = localStorage.getItem('chatSessionId');
+    if (existingId) return existingId;
+    const newId = `session_${Date.now()}`;
+    localStorage.setItem('chatSessionId', newId);
+    return newId;
+  });
+  const currentRequestRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const speechTimeoutRef = useRef(null);
 
   const PYTHON_API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
+
+  const cancelCurrentRequest = () => {
+    console.log('🛑 Attempting to cancel current request');
+    if (abortControllerRef.current) {
+      console.log('🛑 Aborting active request');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+    console.log('✅ Request cancelled');
+  };
+
+  const handleUserSpeechStart = () => {
+    console.log('🎤 Speech Start Detected');
+    setIsUserSpeaking(true);
+    
+    // Cancel ongoing AI response
+    if (abortControllerRef.current) {
+      console.log('🛑 Cancelling AI response due to user speech');
+      cancelCurrentRequest();
+      stopSpeaking();
+    }
+  };
+
+  const handleUserSpeechEnd = () => {
+    console.log('🎤 Speech End Detected');
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+    }
+    
+    speechTimeoutRef.current = setTimeout(() => {
+      console.log('🎤 Confirming speech end after timeout');
+      setIsUserSpeaking(false);
+    }, 500);
+  };
 
   const handleVoiceInteraction = async () => {
     if (isRecording) {
@@ -45,54 +93,103 @@ function MessageInput({ onSendMessage, isLoading }) {
       return;
     }
 
+    cancelCurrentRequest();
+
     try {
       setIsRecording(true);
       setOverlayMessages([]);
       
       const handleTranscript = async (data) => {
         try {
-          if (!data?.content) {
-            console.warn('Invalid transcript data:', data);
+          console.log('📝 Received transcript data:', data);
+
+          // Handle speech events
+          if (data.speech_started) {
+            console.log('🎤 Speech start event received');
+            handleUserSpeechStart();
+            return;
+          }
+          if (data.speech_ended) {
+            console.log('🎤 Speech end event received');
+            handleUserSpeechEnd();
             return;
           }
 
-          console.log('Received transcript:', data);
-          onSendMessage(data.content, "user");
-
-          const response = await fetch(`${PYTHON_API_URL}/voice-chat`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Session-ID': sessionId
-            },
-            body: JSON.stringify({
-              message: data.content,
-              model: selectedModel,
-              language: data.language || 'en-US'
-            })
-          });
-
-          const responseData = await response.json();
-          console.log('API response:', responseData);
-
-          if (!responseData.success) {
-            throw new Error(responseData.detail || 'API request failed');
+          if (!data?.content) {
+            console.warn('⚠️ Invalid transcript data received');
+            return;
           }
 
-          onSendMessage(responseData.response, "assistant");
-
-          if (!isMuted && responseData.response) {
-            setIsAISpeaking(true);
-            await speakWithDeepgram(
-              responseData.response, 
-              responseData.language || data.language || 'en-US'
-            );
-            setIsAISpeaking(false);
+          // Process transcript
+          if (!data.isFinal && (!data.confidence || data.confidence < 0.85)) {
+            console.log('⏳ Skipping low confidence interim result');
+            return;
           }
 
+          console.log(`📝 Processing ${data.isFinal ? 'final' : 'interim'} transcript:`, data.content);
+          
+          if (data.isFinal) {
+            console.log('🎯 Processing final transcript');
+            cancelCurrentRequest();
+            
+            setOverlayMessages(prev => [...prev, { type: 'user', content: data.content }]);
+            onSendMessage(data.content, "user");
+
+            try {
+              abortControllerRef.current = new AbortController();
+              currentRequestRef.current = Date.now();
+              const currentRequest = currentRequestRef.current;
+
+              console.log('🚀 Sending request to API');
+              const response = await fetch(`${PYTHON_API_URL}/voice-chat`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Session-ID': sessionId,
+                  'X-Request-ID': currentRequest.toString()
+                },
+                body: JSON.stringify({
+                  message: data.content,
+                  model: selectedModel,
+                  language: data.language || 'en-US'
+                }),
+                signal: abortControllerRef.current.signal
+              });
+
+              if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+              }
+
+              const responseData = await response.json();
+              console.log('✅ Received API response:', responseData);
+
+              if (currentRequestRef.current === currentRequest) {
+                setOverlayMessages(prev => [...prev, { type: 'assistant', content: responseData.response }]);
+                onSendMessage(responseData.response, "assistant");
+
+                // Add speech synthesis
+                if (!isMuted) {
+                  setIsAISpeaking(true);
+                  try {
+                    await speakWithDeepgram(responseData.response);
+                  } catch (error) {
+                    console.error('Speech synthesis error:', error);
+                  } finally {
+                    setIsAISpeaking(false);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('❌ API request error:', error);
+              if (error.name === 'AbortError') {
+                console.log('🛑 Request was cancelled');
+              } else {
+                onSendMessage(`Error: ${error.message}`, "system");
+              }
+            }
+          }
         } catch (error) {
-          console.error('Voice chat error:', error);
-          onSendMessage(`Error: ${error.message}`, "system");
+          console.error('❌ Transcript processing error:', error);
         }
       };
 
@@ -124,43 +221,98 @@ function MessageInput({ onSendMessage, isLoading }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!message.trim() || isSubmitting) return;
+    
+    if (!message.trim() || isSubmitting) {
+        return;
+    }
 
-    setIsSubmitting(true);
-    onSendMessage(message.trim(), "user");
-    setMessage('');
+    const requestId = Date.now();
+    const currentMessage = message.trim();
 
+    cancelCurrentRequest();
+    
     try {
-      const response = await fetch(`${PYTHON_API_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-ID': sessionId
-        },
-        body: JSON.stringify({
-          message: message.trim(),
-          model: selectedModel
-        })
-      });
+        setIsSubmitting(true);
+        setMessage('');
+        onSendMessage(currentMessage, "user");
 
-      if (!response.ok) {
-        throw new Error(`Failed to get response from the server (${response.status}).`);
-      }
+        abortControllerRef.current = new AbortController();
+        currentRequestRef.current = requestId;
 
-      const data = await response.json();
-      if (data.response) {
-        onSendMessage(data.response, "assistant");
-        // Update session ID if provided
-        if (data.sessionId && data.sessionId !== sessionId) {
-          setSessionId(data.sessionId);
-          localStorage.setItem('chatSessionId', data.sessionId);
+        stopSpeaking();
+
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${PYTHON_API_URL}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-Session-ID': sessionId,
+                'X-Request-ID': requestId.toString(),
+                'X-Cancel-Previous': 'true'
+            },
+            body: JSON.stringify({
+                message: currentMessage,
+                model: selectedModel
+            }),
+            signal: abortControllerRef.current.signal
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status ${response.status}`);
         }
-      }
+
+        // Handle streaming response
+        const reader = response.body.getReader();
+        let accumulatedResponse = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                // Decode the chunk
+                const chunk = new TextDecoder().decode(value);
+                const lines = chunk.split('\n');
+                
+                // Process each line
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        
+                        if (data === '[DONE]') {
+                            break;
+                        }
+                        
+                        try {
+                            accumulatedResponse += data;
+                            if (currentRequestRef.current === requestId) {
+                                onSendMessage(accumulatedResponse, "assistant", true);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing chunk:', e);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('Stream aborted:', error);
+            } else {
+                throw error;
+            }
+        }
+
     } catch (error) {
-      console.error('Error:', error);
-      onSendMessage(`Error: ${error.message}`, "system");
+        if (error.name !== 'AbortError') {
+            onSendMessage(`Error: ${error.message}`, "system");
+        }
     } finally {
-      setIsSubmitting(false);
+        if (currentRequestRef.current === requestId) {
+            setIsSubmitting(false);
+            abortControllerRef.current = null;
+        }
     }
   };
 
@@ -200,26 +352,30 @@ function MessageInput({ onSendMessage, isLoading }) {
   const getModelIcon = (modelId) => {
     switch (modelId) {
       case "gemini-pro":
-      case "gemini-flash-2.0":
         return <TbBrandGoogleFilled className="h-4 w-4 text-[#cc2b5e]" />;
       case "gpt-3.5-turbo":
-      case "gpt-4o":
-      case "gpt-4o-mini":
-      case "gpt3-mini":
         return <SiOpenai className="h-4 w-4 text-[#cc2b5e]" />;
-      case "claude-3-opus":
-      case "claude-3.5-haiku":
+      case "claude-3-haiku":
         return <TbBrain className="h-4 w-4 text-[#cc2b5e]" />;
-      case "llama-3.3-70b":
+      case "llama-v2-7b":
         return <SiClarifai className="h-4 w-4 text-[#cc2b5e]" />;
+      case "mixtral-8x7b":
+        return <HiSparkles className="h-4 w-4 text-[#cc2b5e]" />;
       default:
         return <HiSparkles className="h-4 w-4 text-[#cc2b5e]" />;
     }
   };
 
+  const stopSpeaking = () => {
+    // Add any cleanup for ongoing speech synthesis
+    setIsAISpeaking(false);
+    // You might need to add a method to stop ongoing speech in your speakWithDeepgram utility
+  };
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      cancelCurrentRequest();
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current);
       }
@@ -227,6 +383,9 @@ function MessageInput({ onSendMessage, isLoading }) {
         stopRef.current();
       }
       setIsAISpeaking(false);
+      if (speechTimeoutRef.current) {
+        clearTimeout(speechTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -264,14 +423,25 @@ function MessageInput({ onSendMessage, isLoading }) {
               </span>
             </motion.button>
 
-            <input
-              type="text"
+            <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
               placeholder="Message Audio-Smith..."
-              className="w-full sm:w-auto flex-1 bg-transparent px-2 sm:px-4 py-2 sm:py-3 text-white/90 placeholder:text-white/40 focus:outline-none text-xs sm:text-sm rounded-xl transition-all duration-200 focus:bg-white/5"
+              className="w-full sm:w-auto flex-1 bg-transparent px-2 sm:px-4 py-2 sm:py-3 text-sm sm:text-base text-white/90 placeholder:text-white/40 focus:outline-none rounded-xl transition-all duration-200 focus:bg-white/5 resize-none overflow-hidden min-h-[44px] max-h-[200px]"
+              rows={1}
+              style={{ height: 'auto' }}
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
             />
 
             <div className="flex items-center gap-1 sm:gap-2">
@@ -358,6 +528,7 @@ function MessageInput({ onSendMessage, isLoading }) {
                       <span className="text-center text-[8px] sm:text-[10px] leading-tight">
                         {model.name}
                       </span>
+                      <span className="text-[8px] opacity-60">{model.cost}</span>
                     </button>
                   ))}
                 </div>
@@ -372,6 +543,10 @@ function MessageInput({ onSendMessage, isLoading }) {
           onClose={handleOverlayClose}
           isRecording={isRecording}
           onMuteToggle={(muted) => setIsMuted(muted)}
+          messages={overlayMessages}
+          isUserSpeaking={isUserSpeaking}
+          isAISpeaking={isAISpeaking}
+          isProcessing={isProcessing}
         />
       )}
     </>
@@ -379,4 +554,3 @@ function MessageInput({ onSendMessage, isLoading }) {
 }
 
 export default MessageInput;
-

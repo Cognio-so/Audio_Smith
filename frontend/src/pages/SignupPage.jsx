@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext"
 import { Link } from "react-router-dom"
 
 export default function SignupForm() {
-  const { signup } = useAuth()
+  const { signup, googleLogin, githubLogin } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -42,7 +42,7 @@ export default function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-l from-[#232526] to-[#414345] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md mx-4 sm:mx-6 md:mx-8 space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
@@ -51,7 +51,10 @@ export default function SignupForm() {
 
         <div className="mt-8 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors">
+            <button 
+              onClick={googleLogin}
+              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#1a1a1a] hover:bg-[#2a2a2a] transition-colors"
+            >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -60,7 +63,10 @@ export default function SignupForm() {
               </svg>
               Google
             </button>
-            <button className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#363739] hover:bg-[#4A4B4D] transition-colors">
+            <button 
+              onClick={githubLogin}
+              className="flex items-center justify-center px-4 py-2 border border-white/10 rounded-md text-slate-200 bg-[#1a1a1a] hover:bg-[#2a2a2a] transition-colors"
+            >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -76,7 +82,7 @@ export default function SignupForm() {
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 text-gray-400 bg-[#363739] rounded-xl">
+              <span className="px-2 text-gray-400 bg-[#1a1a1a] rounded-xl">
                 or continue with
               </span>
             </div>
@@ -158,7 +164,7 @@ export default function SignupForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-white/10 rounded-md shadow-sm text-sm font-medium text-white bg-[#363739] hover:bg-[#4A4B4D] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#cc2b5e] to-[#753a88] hover:opacity-90 disabled:opacity-50 transition-colors"
             >
               {loading ? "Creating Account..." : "Create Account"}
             </button>
@@ -166,7 +172,7 @@ export default function SignupForm() {
 
           <p className="mt-4 text-center text-sm text-gray-400">
             Already have an account?{" "}
-            <Link to="/login" className="text-blue-500 hover:text-blue-400">
+            <Link to="/login" className="text-[#cc2b5e] hover:text-[#753a88]">
               Sign in
             </Link>
           </p>

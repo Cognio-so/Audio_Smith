@@ -1,27 +1,27 @@
 import { motion } from "framer-motion";
 import { Cpu, Sparkles } from "lucide-react";
 
-const Models = () => {
+const ModelsName = () => {
   const modelCards = [
     {
-      name: "Smart Voice Interface",
-      description: "Natural language understanding for seamless interactions",
-      features: ["Voice Commands", "Conversational AI", "Multi-language Support"],
+      name: "OpenAI",
+      description: "The foundation model by OpenAI. Good for most general tasks",
+      features: ["GPT-4 Turbo", "GPT-4", "GPT-3.5 Turbo", "DALL-E 3"],
     },
     {
-      name: "Real-time Processing",
-      description: "Instant response to voice inputs",
-      features: ["Low Latency", "High Accuracy", "Continuous Learning"],
+      name: "Anthropic",
+      description: "Anthropic's fastest and lightest model",
+      features: ["Claude 3 Opus", "Claude 3 Sonnet", "Claude 3 Haiku", "Claude 2.1"],
     },
     {
-      name: "Secure Integration",
-      description: "Enterprise-grade security solutions",
-      features: ["Data Encryption", "Role-based Access", "Compliance Ready"],
+      name: "DeepSeek",
+      description: "An updated, distilled version of Meta's 405B flagship model",
+      features: ["DeepSeek Coder 33B", "DeepSeek Code 7B", "DeepSeek LLM 67B", "DeepSeek MoE"],
     },
     {
-      name: "Cross-platform",
-      description: "Works wherever your team operates",
-      features: ["Web & Mobile", "API Access", "Cloud & On-prem"],
+      name: "Google",
+      description: "Google's lightweight counterpart to their flagship model. Great performance for its size",
+      features: ["Gemini Ultra", "Gemini Pro", "Gemini Nano", "PaLM 2"],
     },
   ];
 
@@ -38,10 +38,10 @@ const Models = () => {
             <Cpu className="w-6 h-6 text-primary" />
           </div>
           <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-            Vaani Pro Platform Features
+            AI Companies & Models
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Enterprise-grade voice AI solutions with built-in intelligence
+            Access models from leading AI companies through our unified platform
           </p>
         </motion.div>
 
@@ -99,4 +99,4 @@ const Models = () => {
   );
 };
 
-export default Models;
+export default ModelsName;

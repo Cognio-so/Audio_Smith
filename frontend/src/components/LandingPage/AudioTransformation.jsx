@@ -36,9 +36,11 @@ const AudioTransform = () => {
               ]
             }}
             transition={{ duration: 3, repeat: Infinity }}
-            className="w-20 h-20 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center mx-auto mb-8"
+            className="w-24 h-24 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center mx-auto mb-16"
           >
-            <span className="text-2xl font-bold text-white">AI</span>
+            <span className="text-2xl font-bold text-white">
+              <img src="/vannipro.png" alt="Vanni Pro" className="w-14 h-14" />
+            </span>
           </motion.div>
 
           <div className="flex justify-center gap-8 md:gap-16 flex-wrap">

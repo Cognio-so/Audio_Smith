@@ -4,7 +4,9 @@ import Features from "../components/LandingPage/Feature";
 import Hero from "../components/LandingPage/Hero";
 import AudioTransformation from "../components/LandingPage/AudioTransformation";
 import Model from "../components/LandingPage/Model";
+import ModelsName from "../components/LandingPage/ModelsName";
 import Footer from "../components/LandingPage/Footer";
+import Navbar from "../components/Navbar/Navbar";
 
 const HeroPage = () => {
   const controls = useAnimation();
@@ -20,10 +22,12 @@ const HeroPage = () => {
       transition={{ duration: 0.8 }}
       className="min-h-screen bg-[#090909] text-white"
     >
+      <Navbar />
       <Hero />
       <Features />
       <AudioTransformation />
       <Model />
+      <ModelsName />
       <Footer />
     </motion.div>
   );

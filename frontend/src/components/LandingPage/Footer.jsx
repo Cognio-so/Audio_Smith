@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Github, Twitter , Linkedin , Instagram , Facebook ,} from "lucide-react";
+import {  Twitter , Linkedin , Youtube } from "lucide-react";
 import Logo from "./Logo";
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
@@ -33,6 +34,16 @@ const Footer = () => {
           </div>
           
           <div>
+            <h4 className="font-display font-semibold mb-4">Legal</h4>
+            <ul className="space-y-2">
+              <li><Link to="/terms" className="text-gray-400 hover:text-primary transition-colors">Terms & Conditions</Link></li>
+              <li><Link to="/privacy" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/refund" className="text-gray-400 hover:text-primary transition-colors">Refund Policy</Link></li>
+              <li><Link to="/about" className="text-gray-400 hover:text-primary transition-colors">About Us</Link></li>
+            </ul>
+          </div>
+          
+          <div>
             <h4 className="font-display font-semibold mb-4">Connect with us</h4>
             <div className="flex gap-2">
               <motion.a
@@ -47,13 +58,6 @@ const Footer = () => {
                 href="#"
                 className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
               >
-                <Github className="w-5 h-5" />
-                </motion.a>
-              <motion.a
-                whileHover={{ scale: 1.1 }}
-                href="#"
-                className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-              >
                 <Linkedin className="w-5 h-5" />
               </motion.a>
               <motion.a
@@ -61,20 +65,14 @@ const Footer = () => {
                 href="#"
                 className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
               >
-                <Instagram className="w-5 h-5" />
-              </motion.a>   
-              <motion.a
-                whileHover={{ scale: 1.1 }}
-                href="#"
-                className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                <Facebook className="w-5 h-5" />
+                <Youtube className="w-5 h-5" />
               </motion.a>
+              
             </div>
           </div>
         </div>
         
-        <div className="mt-20 pt-8 border-t border-white/10 text-center text-gray-400">
+        <div className="mt-20 pt-10 border-t border-white/10 text-center text-gray-400">
           <p>&copy; {new Date().getFullYear()} vaani.pro. All rights reserved.</p>
         </div>
       </div>

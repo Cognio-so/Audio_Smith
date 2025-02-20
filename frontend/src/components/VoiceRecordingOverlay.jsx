@@ -1,147 +1,178 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { FiX, FiMic, FiMicOff } from "react-icons/fi";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiX } from "react-icons/fi";
+import { createPortal } from 'react-dom';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { MeshDistortMaterial, Sphere } from '@react-three/drei';
+import * as THREE from 'three';
 
-function VoiceRecordingOverlay({ onClose, isRecording, onMuteToggle }) {
-  const [intensity, setIntensity] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+// Update gradient texture with new colors
+const gradientTexture = new THREE.CanvasTexture((() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  const gradient = context.createLinearGradient(0, 0, 256, 256);
+  gradient.addColorStop(0, '#1a1020');  // Dark color for sphere
+  gradient.addColorStop(1, '#2a1835');  // Dark color for sphere
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 256, 256);
+  return canvas;
+})());
 
-  useEffect(() => {
-    if (isRecording) {
-      const interval = setInterval(() => {
-        setIntensity(Math.random() * 0.3 + 1);
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, [isRecording]);
+function AnimatedSphere({ isActive }) {
+  const meshRef = useRef(null);
 
-  const handleMuteToggle = () => {
-    setIsMuted(!isMuted);
-    if (onMuteToggle) {
-      onMuteToggle(!isMuted);
-    }
-  };
+  useFrame((state) => {
+    if (!meshRef.current) return;
+    meshRef.current.rotation.x = state.clock.getElapsedTime() * (isActive ? 0.5 : 0.2);
+    meshRef.current.rotation.y = state.clock.getElapsedTime() * (isActive ? 0.3 : 0.1);
+    meshRef.current.position.y = Math.sin(state.clock.getElapsedTime()) * 0.1;
+  });
 
   return (
-    <motion.div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-    >
-      <div className="relative w-[400px] h-[400px]">
-        {/* Base orb with immediate appearance */}
-        <div className="absolute inset-0 rounded-full overflow-hidden">
-          <motion.div
-            initial={{ scale: 1 }}
-            className="w-full h-full bg-gradient-to-r from-[#cc2b5e] to-[#753a88]"
-            animate={{
-              scale: isRecording ? [1, intensity, 1] : 1,
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-
-        {/* Outer glow layer */}
-        <div className="absolute inset-[-20px] rounded-full opacity-40">
-          <motion.div
-            initial={{ scale: 1 }}
-            className="w-full h-full"
-            style={{
-              background: 'radial-gradient(circle at center, transparent 30%, #cc2b5e 70%, #753a88 100%)',
-              filter: 'blur(40px)',
-            }}
-            animate={{
-              scale: isRecording ? [1, intensity * 1.1, 1] : 1,
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.2
-            }}
-          />
-        </div>
-
-        {/* Inner bright core */}
-        <div className="absolute inset-[60px] rounded-full">
-          <motion.div
-            initial={{ scale: 1 }}
-            className="w-full h-full"
-            style={{
-              background: 'radial-gradient(circle at center, white 0%, #cc2b5e 30%, transparent 70%)',
-              filter: 'blur(10px)',
-            }}
-            animate={{
-              scale: isRecording ? [1, intensity * 0.9, 1] : 1,
-              opacity: isRecording ? [0.7, 0.9, 0.7] : 0.7,
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-
-        {/* Dynamic color swirl */}
-        <div className="absolute inset-0 rounded-full overflow-hidden">
-          <motion.div
-            initial={{ rotate: 0 }}
-            className="w-full h-full"
-            style={{
-              background: 'conic-gradient(from 0deg, #cc2b5e, #753a88, #cc2b5e)',
-              opacity: 0.4,
-              filter: 'blur(20px)',
-            }}
-            animate={{
-              rotate: 360,
-            }}
-            transition={{
-              duration: 10,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-          />
-        </div>
-
-        {/* Glass effect overlay */}
-        <div 
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 60%)',
-            backdropFilter: 'blur(5px)',
-          }}
-        />
-
-        {/* Bottom buttons container */}
-        <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 flex gap-4">
-          <button
-            onClick={handleMuteToggle}
-            className="p-4 rounded-full bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-white/10 transition-colors"
-          >
-            {isMuted ? (
-              <FiMicOff className="w-6 h-6 text-[#cc2b5e]" />
-            ) : (
-              <FiMic className="w-6 h-6 text-white" />
-            )}
-          </button>
-
-          <button
-            onClick={onClose}
-            className="p-4 rounded-full bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-white/10 transition-colors"
-          >
-            <FiX className="w-6 h-6 text-white" />
-          </button>
-        </div>
-      </div>
-    </motion.div>
+    <Sphere args={[1, 64, 64]} ref={meshRef}>
+      <MeshDistortMaterial
+        attach="material"
+        distort={isActive ? 0.4 : 0.2}
+        speed={isActive ? 2 : 1}
+        roughness={0.4}
+        metalness={0.3}
+        radius={1}
+      >
+        <primitive attach="map" object={gradientTexture} />
+      </MeshDistortMaterial>
+    </Sphere>
   );
+}
+
+function VoiceRecordingOverlay({ 
+  onClose, 
+  isRecording, 
+  isUserSpeaking, 
+  isAISpeaking,
+  messages = [],
+  isProcessing
+}) {
+  const [intensity, setIntensity] = useState(1);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isProcessing]);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
+  const overlayContent = (
+    <AnimatePresence>
+      <motion.div 
+        className="fixed inset-0 w-screen h-screen z-[99999]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        {/* Update background gradient - removed opacity */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#dae2f8] to-[#d6a4a4]" />
+
+        {/* Content Container - removed any box-shadow */}
+        <div className="relative h-full flex flex-col">
+          {/* Close Button - removed shadow */}
+          <div className="absolute top-4 left-4">
+            <motion.button
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FiX className="w-6 h-6 text-white/90" />
+            </motion.button>
+          </div>
+
+          {/* Updated Messages Area */}
+          <div className="flex-1 px-4 overflow-y-auto scrollbar-none pt-16 pb-48">
+            <div className="max-w-2xl mx-auto space-y-4">
+              {messages.map((msg, index) => (
+                <motion.div
+                  key={index}
+                  className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div 
+                    className={`max-w-[80%] rounded-2xl p-4 ${
+                      msg.type === 'user' 
+                        ? 'bg-gradient-to-r from-[#2a1835] to-[#1a1020] shadow-lg'
+                        : 'bg-[#1a1020] shadow-lg'
+                    }`}
+                  >
+                    <p className="text-white/90 text-sm leading-relaxed">{msg.content}</p>
+                  </div>
+                </motion.div>
+              ))}
+              
+              {isProcessing && (
+                <motion.div 
+                  className="flex justify-start"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <div className="bg-[#1a1020] rounded-2xl p-4 shadow-lg">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-white/90 text-sm">Processing</p>
+                      <motion.div className="flex space-x-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="w-1.5 h-1.5 bg-white/90 rounded-full"
+                            animate={{ y: ["0%", "-50%", "0%"] }}
+                            transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
+                          />
+                        ))}
+                      </motion.div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Bottom section */}
+          <div className="absolute bottom-0 left-0 right-0 h-48">
+            <Canvas 
+              camera={{ position: [0, 0, 3] }}
+              style={{ WebkitBackfaceVisibility: 'hidden' }}
+            >
+              <ambientLight intensity={0.5} />
+              <directionalLight position={[10, 10, 5]} intensity={1} />
+              <AnimatedSphere isActive={isUserSpeaking || isAISpeaking} />
+            </Canvas>
+            
+            <motion.span 
+              className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-white/90 text-sm"
+              animate={{ opacity: [0.7, 1, 0.7] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              {isUserSpeaking ? "Listening..." : isAISpeaking ? "Speaking..." : "Try saying something..."}
+            </motion.span>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+
+  return createPortal(overlayContent, document.body);
 }
 
 export default VoiceRecordingOverlay; 
